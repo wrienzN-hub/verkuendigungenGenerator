@@ -32,7 +32,7 @@ Noch nicht Teil des ersten Schritts:
 
 ## Fachliche Annahmen und offene Punkte
 
-Die Anwendung ist ausschließlich für die Diözese Gurk vorgesehen. Die vorhandene Quelle ist `resources/directorium-2026-27-kern_21092026.pdf`.
+Die Anwendung ist ausschließlich für die Diözese Gurk vorgesehen. Die vorhandene Quelle ist `resources/directorium-2026-27-kern_21092026.pdf`. Jeder importierte Heilige wird mit dem Kirchenjahr seines Directoriums gespeichert, zum Beispiel `2026/27`.
 
 Liturgische Wochen werden nicht in der Datenbank gespeichert. Sobald die Dokumenterzeugung umgesetzt wird, berechnet das System die Woche aus dem konkreten Datum und den Regeln des liturgischen Kalenders. Das liturgische Jahr beginnt dabei am ersten Adventsonntag, also nicht stets am 1. Dezember. Dieser Sonntag liegt je nach Jahr zwischen dem 27. November und dem 3. Dezember.
 
@@ -76,11 +76,11 @@ Der Renderer erhält ausschließlich strukturierte Daten und eine dokumentierte 
 
 | Tabelle | Wichtige Felder | Zweck |
 | --- | --- | --- |
-| `saints` | `id`, `name`, `celebration_date`, `rank`, `disabled`, `source_reference` | Heilige/Gedenktage der Diözese Gurk und ihre Aktivierung. |
+| `saints` | `id`, `liturgical_year`, `name`, `celebration_date`, `rank`, `disabled`, `source_reference` | Heilige/Gedenktage der Diözese Gurk, ihr Kirchenjahr und ihre Aktivierung. |
 | `import_runs` | `id`, `source_file`, `imported_at`, `status` | Nachvollziehbare Importe des Directoriums. |
 | `document_payloads` (später) | `id`, `liturgical_date`, `payload_json`, `created_at`, `updated_at` | Das gesamte anpassbare JSON für ein zu erzeugendes Dokument. |
 
-Wichtig: `disabled` ist kein Löschen. Deaktivierte Einträge bleiben nachvollziehbar in der Datenbank, werden später aber nicht im Dokument ausgegeben. Für Dokumente werden später keine einzelnen `row_overrides` gespeichert; stattdessen liegt der gesamte bearbeitbare Dokumentinhalt in einem JSON-Feld (`payload_json`).
+Wichtig: `disabled` ist kein Löschen. Deaktivierte Einträge bleiben nachvollziehbar in der Datenbank, werden später aber nicht im Dokument ausgegeben. Die Aktivierung gilt jeweils für den Datensatz eines bestimmten Kirchenjahres, etwa für `2026/27`. Für Dokumente werden später keine einzelnen `row_overrides` gespeichert; stattdessen liegt der gesamte bearbeitbare Dokumentinhalt in einem JSON-Feld (`payload_json`).
 
 ## Temporäre Übergabedaten und Word-Vorlage
 
@@ -153,10 +153,10 @@ Die Oberfläche wird mindestens diese Seiten enthalten:
 | Seite | Funktion |
 | --- | --- |
 | Dokument erstellen | Später: Datum bzw. Kirchenjahr und Woche wählen, JSON-Inhalt prüfen/anpassen und Word-Datei generieren. |
-| Heilige verwalten | Alle Heiligen mit Datum, Rang und aktuellem Status anzeigen; jeden Eintrag einzeln per Schalter aktivieren oder deaktivieren. |
+| Heilige verwalten | Alle Heiligen mit Kirchenjahr, Datum, Rang und aktuellem Status anzeigen; jeden Eintrag einzeln per Schalter aktivieren oder deaktivieren. |
 | Dokument bearbeiten | Später das gesamte gespeicherte JSON eines Dokuments anpassen. |
 
-Die Seite **Heilige verwalten** schreibt nur den dauerhaften Status `disabled` eines Eintrags. Deaktivierte Heilige bleiben gespeichert, erscheinen jedoch nicht mehr in neu generierten Dokumenten. Eine Filterung nach Kirchenjahr, Monat, aktiv/deaktiviert und eine Suche nach Name sollten vorgesehen werden.
+Die Seite **Heilige verwalten** schreibt nur den Status `disabled` eines Eintrags im jeweiligen Kirchenjahr. Deaktivierte Heilige bleiben gespeichert, erscheinen jedoch nicht mehr in neu generierten Dokumenten. Eine Filterung nach Kirchenjahr, Monat, aktiv/deaktiviert und eine Suche nach Name sollten vorgesehen werden.
 
 ## KI / neuronales Netz (spätere Ausbaustufe)
 
