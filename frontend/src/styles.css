@@ -1406,3 +1406,44 @@ tbody tr:hover {
   color: #94733a;
   margin: 7px 0 0;
 }
+
+.liturgical-filters {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 17px 25px;
+  border-top: 1px solid #edf0e9;
+  background: #fafbf7;
+  color: #7c9270;
+}
+.liturgical-filters label {
+  min-width: 190px;
+}
+.liturgical-filters label:nth-of-type(2) {
+  min-width: 300px;
+}
+.week-range {
+  font-size: 10px;
+  color: #7d8c73;
+  line-height: 1.6;
+  flex: 1;
+  min-width: 180px;
+}
+@media (max-width: 700px) {
+  .liturgical-filters {
+    padding: 15px;
+    gap: 12px;
+  }
+  .liturgical-filters > svg {
+    display: none;
+  }
+  .liturgical-filters label,
+  .liturgical-filters label:nth-of-type(2) {
+    min-width: 0;
+    width: 100%;
+  }
+  .week-range {
+    width: 100%;
+  }
+}

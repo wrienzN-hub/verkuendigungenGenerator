@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from ...repositories.saints import get_saint, list_celebrations, count_celebrations, update_saint as save_saint
 from ...schemas.saints import Saint, SaintUpdate, SaintPage, Rank, Observance
 from ..dependencies import get_database
+from ...services.liturgical_weeks import list_weeks
 
 router = APIRouter(prefix='/saints', tags=['Heilige und Feiern'])
 Connection = Annotated[sqlite3.Connection, Depends(get_database)]
@@ -37,12 +38,28 @@ def paged_saints(conn: Connection,
     year: str | None = None, search: Annotated[str | None,Query(max_length=200)] = None,
     disabled: bool | None = None, month: Annotated[int | None,Query(ge=1,le=12)] = None,
     rank: Rank | None = None, observance_status: Observance | None = None,
+    liturgical_week: Annotated[str | None,Query(max_length=80)] = None,
     limit: Annotated[int,Query(ge=1,le=1000)] = 25, offset: Annotated[int,Query(ge=0)] = 0):
     if start>end:
         raise HTTPException(422,'Das Ende liegt vor dem Beginn.')
+    if liturgical_week:
+        if not year:
+            raise HTTPException(422,'Für eine liturgische Woche ist ein Kirchenjahr erforderlich.')
+        selected = next((w for w in list_weeks(conn,year) if w['id']==liturgical_week),None)
+        if selected is None:
+            raise HTTPException(422,'Diese liturgische Woche ist im gewählten Directorium nicht vorhanden.')
+        start=max(start,date.fromisoformat(selected['start']))
+        end=min(end,date.fromisoformat(selected['end']))
+        if start>end:
+            return dict(items=[],total=0,limit=limit,offset=offset)
     filters=dict(available_only=False,year=year,search=search,disabled=disabled,month=month,rank=rank,observance_status=observance_status)
     return dict(items=list_celebrations(conn,start.isoformat(),end.isoformat(),limit=limit,offset=offset,**filters),
         total=count_celebrations(conn,start.isoformat(),end.isoformat(),**filters),limit=limit,offset=offset)
+
+
+@router.get('/weeks')
+def week_options(conn: Connection, year: Annotated[str,Query(max_length=20)]):
+    return list_weeks(conn,year)
 
 
 @router.get('/filters')

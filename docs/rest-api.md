@@ -96,3 +96,9 @@ curl.exe -F "file=@resources/directorium-2026-27-kern_21092026.pdf" http://127.0
 `GET /api/v1/imports/{id}/source` liefert das gespeicherte Original-PDF. Die Liste `/api/v1/imports` enthält `has_source`, aber keine PDF-Binärdaten. Es gibt keine Prüfstatusfelder mehr.
 
 Fehlende Kalendertage verhindern den Import nicht, sofern mindestens 90 % des Kirchenjahres erkannt wurden. Der Importbericht enthält `missing_dates` (ISO-Daten) und `expected_calendar_days`. Die Oberfläche zeigt die Lücken nach dem Upload und dauerhaft bei den vorhandenen Directorien an. Für fehlende Tage entstehen keine erfundenen Feiern oder Quellenabschnitte.
+
+## Liturgische Wochen
+
+`GET /api/v1/saints/weeks?year=2026%2F27` liefert die im Directorium erkennbaren Wochen mit `id`, `season`, `season_label`, `week`, `label`, `start` und `end`. Für benannte Zeiträume ohne Wochennummer ist `week` null. Fehlende Kirchenjahre liefern eine leere Liste.
+
+`GET /api/v1/saints/page?year=2026%2F27&liturgical_week=advent%3A2026-11-29` filtert die erste Adventswoche vom 29. November bis einschließlich 6. Dezember. Die Woche muss zum angegebenen Kirchenjahr gehören; ungültige Kombinationen liefern HTTP 422. Ein zusätzlicher Datumsbereich wird mit dem Wochenzeitraum geschnitten. Andere Filter und Paging bleiben kombinierbar.

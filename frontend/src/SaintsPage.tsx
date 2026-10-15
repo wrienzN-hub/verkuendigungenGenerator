@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { request, updateSaint } from './api';
 import { formatDate, months, observances, ranks } from './labels';
-import type { FilterOptions, Saint, SaintPage } from './types';
+import type { FilterOptions, Saint, SaintPage, LiturgicalWeek } from './types';
 import SaintEditor from './SaintEditor';
 import DirectoriumUpload from './DirectoriumUpload';
 
@@ -26,6 +26,8 @@ const emptyFilters = {
   rank: '',
   disabled: '',
   observance_status: '',
+  season: '',
+  liturgical_week: '',
 };
 export default function SaintsPage() {
   const [filters, setFilters] = useState(emptyFilters);
@@ -41,10 +43,43 @@ export default function SaintsPage() {
   const [editing, setEditing] = useState<Saint | null>(null);
   const [advanced, setAdvanced] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [weeks, setWeeks] = useState<LiturgicalWeek[]>([]);
+  const [weeksLoading, setWeeksLoading] = useState(false);
+  const [weeksError, setWeeksError] = useState('');
   const filter = (key: keyof typeof filters, value: string) => {
-    setFilters((f) => ({ ...f, [key]: value }));
+    setFilters((f) => ({
+      ...f,
+      [key]: value,
+      ...(key === 'year' ? { season: '', liturgical_week: '' } : {}),
+      ...(key === 'season' ? { liturgical_week: '' } : {}),
+      ...(key === 'liturgical_week' && value ? { month: '' } : {}),
+    }));
     setPage(0);
   };
+  useEffect(() => {
+    const controller = new AbortController();
+    setWeeks([]);
+    setWeeksError('');
+    if (!filters.year) {
+      setWeeksLoading(false);
+      return;
+    }
+    setWeeksLoading(true);
+    request<LiturgicalWeek[]>(`/api/v1/saints/weeks?year=${encodeURIComponent(filters.year)}`, {
+      signal: controller.signal,
+    })
+      .then((value) => {
+        setWeeks(value);
+        setWeeksLoading(false);
+      })
+      .catch((e) => {
+        if (e.name !== 'AbortError') {
+          setWeeksLoading(false);
+          setWeeksError('Die liturgischen Wochen konnten nicht geladen werden.');
+        }
+      });
+    return () => controller.abort();
+  }, [filters.year, refresh]);
   useEffect(() => {
     const controller = new AbortController();
     request<FilterOptions>('/api/v1/saints/filters', { signal: controller.signal })
@@ -62,7 +97,7 @@ export default function SaintsPage() {
     const timer = window.setTimeout(() => {
       const params = new URLSearchParams({ limit: String(size), offset: String(page * size) });
       Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.set(key, value);
+        if (value && key !== 'season') params.set(key, value);
       });
       request<SaintPage>(`/api/v1/saints/page?${params}`, { signal: controller.signal })
         .then((result) => {
@@ -107,6 +142,8 @@ export default function SaintsPage() {
   };
   const pages = Math.max(1, Math.ceil((data?.total || 0) / size));
   const hasFilters = Object.values(filters).some(Boolean);
+  const seasons = [...new Map(weeks.map((w) => [w.season, w.season_label])).entries()];
+  const selectedWeek = weeks.find((w) => w.id === filters.liturgical_week);
   return (
     <>
       <div className="page-heading">
@@ -232,6 +269,56 @@ export default function SaintsPage() {
               <option value="true">Deaktiviert</option>
             </select>
           </label>
+        </div>
+        <div className="liturgical-filters">
+          <CalendarDays size={18} />
+          <label>
+            Liturgische Zeit
+            <select
+              aria-label="Liturgische Zeit"
+              value={filters.season}
+              disabled={!filters.year || weeksLoading || !!weeksError}
+              onChange={(e) => filter('season', e.target.value)}
+            >
+              <option value="">
+                {!filters.year
+                  ? 'Zuerst Kirchenjahr wählen'
+                  : weeksLoading
+                  ? 'Wochen werden geladen …'
+                  : 'Alle liturgischen Zeiten'}
+              </option>
+              {seasons.map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Liturgische Woche
+            <select
+              aria-label="Liturgische Woche"
+              value={filters.liturgical_week}
+              disabled={!filters.season || weeksLoading}
+              onChange={(e) => filter('liturgical_week', e.target.value)}
+            >
+              <option value="">Alle Wochen</option>
+              {weeks
+                .filter((w) => w.season === filters.season)
+                .map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.label} · {formatDate(w.start)} – {formatDate(w.end)}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <span className="week-range">
+            {selectedWeek
+              ? `${formatDate(selectedWeek.start)} bis ${formatDate(
+                  selectedWeek.end,
+                )} · Sonntag bis Sonntag`
+              : weeksError || 'Wochen laut importiertem Directorium'}
+          </span>
         </div>
         {advanced && (
           <div className="advanced-filters">

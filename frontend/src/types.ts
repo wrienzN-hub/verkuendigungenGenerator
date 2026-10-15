@@ -12,6 +12,15 @@ export type Saint = {
   source_reference: string;
 };
 export type SaintPage = { items: Saint[]; total: number; limit: number; offset: number };
+export type LiturgicalWeek = {
+  id: string;
+  season: string;
+  season_label: string;
+  week: number | null;
+  label: string;
+  start: string;
+  end: string;
+};
 export type FilterOptions = {
   years: string[];
   total: number;

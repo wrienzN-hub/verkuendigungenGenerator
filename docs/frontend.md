@@ -66,3 +66,9 @@ Die Schaltfläche „Directorium hochladen“ öffnet einen Dialog mit Dateiausw
 Unterstützt werden PDF-Dateien bis 25 MB mit auswählbarem Text im Gurker Monats-/Tagesformat. Einzelne fehlende Kalendertage werden als Hinweis angezeigt und verhindern den Import nicht. Abweichende Layouts oder unlesbare Dateien werden weiterhin abgelehnt.
 
 Fehlende Kalendertage verhindern den Import nicht, sofern mindestens 90 % des Kirchenjahres erkannt wurden. Der Importbericht enthält `missing_dates` (ISO-Daten) und `expected_calendar_days`. Die Oberfläche zeigt die Lücken nach dem Upload und dauerhaft bei den vorhandenen Directorien an. Für fehlende Tage entstehen keine erfundenen Feiern oder Quellenabschnitte.
+
+## Nach liturgischer Woche filtern
+
+In der Heiligenverwaltung zuerst das Kirchenjahr, dann die liturgische Zeit und die Woche auswählen. Die Optionen werden aus den datierten Überschriften des importierten Directoriums abgeleitet. Es werden keine ISO-Kalenderwochen verwendet. Der Zeitraum reicht jeweils vom zugehörigen Sonntag bis einschließlich des folgenden Sonntags. Für Weihnachtszeit, Karwoche und den Fastenbeginn werden benannte Zeiträume statt erfundener Wochennummern angeboten.
+
+Bei einer Wochenauswahl wird ein vorheriger Monatsfilter zurückgesetzt, damit Wochen über eine Monatsgrenze vollständig erscheinen. Suche, Rang, Aktivierung und Verfügbarkeit lassen sich weiterhin kombinieren. Es werden die Einträge des gewählten Kirchenjahres angezeigt; ein bereits zum nächsten Kirchenjahr gehörender Endsonntag ist darin nicht enthalten. Lücken im Directorium werden nicht mit erfundenen Daten gefüllt.
