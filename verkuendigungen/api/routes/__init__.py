@@ -1,0 +1,1 @@
+"""REST-Routen nach Fachbereich."""

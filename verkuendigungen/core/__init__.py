@@ -1,0 +1,1 @@
+"""Konfiguration und gemeinsame Anwendungseinstellungen."""

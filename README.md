@@ -1,8 +1,38 @@
 # Verkündigungen-Generator
 
-Ein Generator für kirchliche Verkündigungen. Später erstellt die Anwendung für eine gewählte Woche des Kirchenjahres ein Word-Dokument auf Basis einer austauschbaren Vorlage. Das Dokument enthält die Gottesdienste am Sonntag sowie die Heiligen und Gedenktage der betreffenden Woche.
+Ein Generator für kirchliche Verkündigungen. Später erstellt die Anwendung für eine gewählte liturgische Woche ein PDF auf Basis einer austauschbaren Word-Vorlage. Das Dokument enthält die Gottesdienste sowie die Heiligen und Gedenktage vom gewählten Sonntag bis einschließlich des folgenden Sonntags.
 
 Der erste Meilenstein ist bewusst schlank: Die Heiligen und Gedenktage aus dem Directorium werden zuverlässig in eine Datenbank übernommen und können aktiviert bzw. deaktiviert werden. Die spätere Dokumenterzeugung, Bearbeitungsoberfläche und eine KI-gestützte Vorlagenerkennung bauen darauf auf.
+
+## Implementierter Stand
+
+Die REST-API ist eingerichtet. Struktur, Endpunkte und Startanleitung: [docs/rest-api.md](docs/rest-api.md).
+
+```powershell
+py -m venv .venv-api
+.\.venv-api\Scripts\python.exe -m pip install -e ".[test]"
+.\.venv-api\Scripts\python.exe -m uvicorn verkuendigungen.api.app:app --reload --host 127.0.0.1 --port 8000
+```
+
+Danach die interaktive Dokumentation unter `http://127.0.0.1:8000/docs` öffnen. Docker ist für den lokalen Start nicht nötig.
+
+- Lokale SQLite-Datenbank: `data/verkuendigungen.sqlite3`.
+- Versionierte SQL-Migration, reproduzierbarer Directorium-Import und Kommandozeilenverwaltung.
+- 377 liturgische Feiern einschließlich Heiliger, Sonntage, Feste und entfallener Gedenktage für alle 364 Tage vom 29. November 2026 bis 27. November 2027.
+- Aktivierung/Deaktivierung, Datumsabfrage, CSV-Export und Quellenreferenzen sind implementiert. Wiederholter Import derselben Quelle erzeugt keine Duplikate und erhält manuelle Statusänderungen.
+- Automatische Extraktion und technische Prüfungen abgeschlossen; eine fachliche Freigabe ist damit nicht vorgetäuscht. Alle Einträge tragen zunächst `review_status = needs_review`.
+
+Einrichtung mit Python 3.12 oder neuer:
+
+```powershell
+python -m pip install -e .
+python -m verkuendigungen init
+python -m verkuendigungen import-directorium
+python -m verkuendigungen list --start 2026-11-29 --end 2026-12-06
+python -m unittest discover -s tests -v
+```
+
+Die enthaltene Datenbank ist bereits befüllt. Details zum tatsächlichen Datenmodell und zur Bedienung stehen in [docs/datenbank.md](docs/datenbank.md), der Importbericht in [data/import-report-2026-27.json](data/import-report-2026-27.json). Der konkretisierte Ablauf und das JSON-Template sind unter [docs/dokumentablauf.md](docs/dokumentablauf.md) beschrieben. Die folgenden Abschnitte enthalten zusätzlich die ursprüngliche Planung; für die vorhandene Implementierung gilt die Datenbankdokumentation.
 
 ## Zielbild
 
@@ -172,4 +202,4 @@ Ein Training ist erst sinnvoll, wenn genügend gelabelte Beispielvorlagen und ko
 
 ## Nächster konkreter Schritt
 
-Der nächste konkrete Schritt ist der Import der Heiligen aus dem vorhandenen Directorium in die Datenbank. Die Word-Vorlage, die JSON-Struktur für Dokumente und die Berechnung von Wochen folgen erst danach.
+Der Directorium-Import ist implementiert und die Datenbank befüllt. Als Nächstes folgen die fachliche Prüfung der extrahierten Daten sowie die Auswahl liturgischer Wochen und die Bearbeitungsoberfläche. Die vorhandene Word-Vorlage und das JSON-Template dienen anschließend der PDF-Erzeugung.

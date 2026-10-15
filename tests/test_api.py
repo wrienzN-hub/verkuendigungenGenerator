@@ -1,0 +1,72 @@
+import tempfile
+import unittest
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from verkuendigungen.api.app import create_app
+from verkuendigungen.infrastructure.database import database
+from verkuendigungen.services.directorium import import_pdf
+
+
+class ApiTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.temp = tempfile.TemporaryDirectory()
+        cls.path = Path(cls.temp.name) / 'api.sqlite3'
+        with database(cls.path) as conn:
+            import_pdf(conn)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temp.cleanup()
+
+    def setUp(self):
+        self.client = TestClient(create_app(self.path))
+        self.client.__enter__()
+
+    def tearDown(self):
+        self.client.__exit__(None, None, None)
+
+    def test_health_and_openapi(self):
+        self.assertEqual(self.client.get('/health').json(), {'status': 'ok'})
+        self.assertIn('/api/v1/saints/{saint_id}', self.client.get('/openapi.json').json()['paths'])
+
+    def test_week_filter_and_boolean_serialization(self):
+        response = self.client.get('/api/v1/saints', params={'start': '2026-11-29', 'end': '2026-12-06', 'available_only': True})
+        self.assertEqual(response.status_code, 200)
+        rows = response.json()
+        self.assertEqual(len(rows), 8)
+        self.assertTrue(all(r['disabled'] is False for r in rows))
+        self.assertFalse(any('Nikolaus' in r['name'] for r in rows))
+
+    def test_admin_search_and_pagination(self):
+        rows = self.client.get('/api/v1/saints', params={'search': 'Nikolaus', 'year': '2026/27'}).json()
+        self.assertEqual(rows[0]['observance_status'], 'suppressed')
+        first = self.client.get('/api/v1/saints', params={'limit': 1}).json()
+        second = self.client.get('/api/v1/saints', params={'limit': 1, 'offset': 1}).json()
+        self.assertNotEqual(first[0]['id'], second[0]['id'])
+
+    def test_patch_persists_and_rejects_non_booleans(self):
+        url = '/api/v1/saints/1'
+        try:
+            response = self.client.patch(url, json={'disabled': True})
+            self.assertEqual(response.status_code, 200)
+            self.assertIs(response.json()['disabled'], True)
+            self.assertIs(self.client.get(url).json()['disabled'], True)
+            self.assertEqual(self.client.patch(url, json={'disabled': 1}).status_code, 422)
+            self.assertEqual(self.client.patch(url, json={'disabled': False, 'name': 'x'}).status_code, 422)
+        finally:
+            self.client.patch(url, json={'disabled': False})
+
+    def test_invalid_dates_and_missing_records(self):
+        self.assertEqual(self.client.get('/api/v1/saints?start=2027-02-30').status_code, 422)
+        self.assertEqual(self.client.get('/api/v1/saints?start=2027-03-02&end=2027-03-01').status_code, 422)
+        self.assertEqual(self.client.get('/api/v1/saints?limit=0').status_code, 422)
+        self.assertEqual(self.client.get('/api/v1/saints/99999').status_code, 404)
+        self.assertEqual(self.client.patch('/api/v1/saints/99999', json={'disabled': False}).status_code, 404)
+
+    def test_import_status(self):
+        response = self.client.get('/api/v1/imports')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()[0]['report']['celebrations'], 377)

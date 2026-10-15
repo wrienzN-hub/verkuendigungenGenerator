@@ -1,0 +1,1 @@
+"""Persistenz und Datenbankschema."""

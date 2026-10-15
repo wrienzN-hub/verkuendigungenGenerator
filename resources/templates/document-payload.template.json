@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "template_id": "eberndorf",
+  "template_version": 1,
+  "parish": {
+    "id": "eberndorf",
+    "name": { "de": "Pfarre Eberndorf", "sl": "" }
+  },
+  "selection": {
+    "liturgical_year": "2026/27",
+    "season": "advent",
+    "week": 1
+  },
+  "period": {
+    "start": "2026-11-29",
+    "end": "2026-12-06"
+  },
+  "days": [
+    {
+      "id": "day-2026-11-29",
+      "date": "2026-11-29",
+      "enabled": true,
+      "celebrations": [
+        {
+          "id": "celebration-1",
+          "source_celebration_id": null,
+          "title": { "de": "1. Adventssonntag", "sl": "" },
+          "rank": "sunday",
+          "enabled": true
+        }
+      ],
+      "services": [
+        {
+          "id": "service-1",
+          "enabled": true,
+          "time": null,
+          "location": { "de": "", "sl": "" },
+          "title": { "de": "Heilige Messe", "sl": "Sveta maša" },
+          "intentions": [
+            {
+              "id": "intention-1",
+              "enabled": true,
+              "symbol": "+",
+              "text": { "de": "", "sl": "" },
+              "reference": null
+            }
+          ],
+          "notices": []
+        }
+      ],
+      "notices": [
+        {
+          "id": "day-notice-1",
+          "enabled": true,
+          "text": { "de": "", "sl": "" }
+        }
+      ]
+    }
+  ],
+  "announcements": [
+    {
+      "id": "announcement-1",
+      "enabled": true,
+      "title": { "de": "", "sl": "" },
+      "paragraphs": [ { "de": "", "sl": "" } ]
+    }
+  ],
+  "eternal_light": {
+    "enabled": true,
+    "dedication": { "de": "", "sl": "" }
+  },
+  "office_hours": [
+    { "weekday": "tuesday", "from": "10:00", "until": "12:00" },
+    { "weekday": "thursday", "from": "09:00", "until": "12:00" }
+  ],
+  "contact": {
+    "persons": [
+      { "name": "", "phone": "" }
+    ],
+    "email": "",
+    "website": ""
+  }
+}
