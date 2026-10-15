@@ -63,4 +63,6 @@ Die Oberfläche benötigt eine laufende API und verwendet echte SQLite-Daten. Si
 
 Die Schaltfläche „Directorium hochladen“ öffnet einen Dialog mit Dateiauswahl und Drag-and-drop. Nach dem erfolgreichen Import zeigt die Oberfläche automatisch die Einträge des erkannten Kirchenjahres. Gleiche Dateien erzeugen keine Duplikate. Fehler werden im Dialog angezeigt; vorhandene Directorien lassen sich dort als Original-PDF öffnen. Es gibt keinen Prüf- oder Freigabestatus.
 
-Unterstützt werden PDF-Dateien bis 25 MB mit auswählbarem Text im Gurker Monats-/Tagesformat. Die technische Prüfung auf ein vollständiges Kirchenjahr bleibt bestehen; abweichende Layouts oder unlesbare Dateien werden ohne Teilimport abgelehnt.
+Unterstützt werden PDF-Dateien bis 25 MB mit auswählbarem Text im Gurker Monats-/Tagesformat. Einzelne fehlende Kalendertage werden als Hinweis angezeigt und verhindern den Import nicht. Abweichende Layouts oder unlesbare Dateien werden weiterhin abgelehnt.
+
+Fehlende Kalendertage verhindern den Import nicht, sofern mindestens 90 % des Kirchenjahres erkannt wurden. Der Importbericht enthält `missing_dates` (ISO-Daten) und `expected_calendar_days`. Die Oberfläche zeigt die Lücken nach dem Upload und dauerhaft bei den vorhandenen Directorien an. Für fehlende Tage entstehen keine erfundenen Feiern oder Quellenabschnitte.

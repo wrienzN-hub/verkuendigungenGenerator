@@ -30,7 +30,7 @@ Am 25. Oktober gibt es zwei örtliche Varianten. Daher sind 365 Quellenabschnitt
 
 ## Upload und Import
 
-Der Upload ist unter `POST /api/v1/imports/directorium` als Multipart-Feld `file` erreichbar. Die Oberfläche bietet denselben Vorgang über „Directorium hochladen“ an. Neue Directorien im Gurker Monats-/Tagesformat werden anhand der Textebene eingelesen. Jahr, Wochentage, Chronologie und die vollständige Abdeckung des Kirchenjahres werden geprüft. Seitenzahl und Position des Kalendariums sind nicht mehr fest vorgegeben. Nicht unterstützte Layouts werden abgelehnt.
+Der Upload ist unter `POST /api/v1/imports/directorium` als Multipart-Feld `file` erreichbar. Die Oberfläche bietet denselben Vorgang über „Directorium hochladen“ an. Neue Directorien im Gurker Monats-/Tagesformat werden anhand der Textebene eingelesen. Jahr, Wochentage, Chronologie und die Abdeckung des Kirchenjahres werden geprüft. Seitenzahl und Position des Kalendariums sind nicht mehr fest vorgegeben. Nicht unterstützte Layouts werden abgelehnt.
 
 Gleiche Prüfsummen führen zu einem bestehenden Import; Namen und Schalter bleiben unverändert. Pro Diözese und Kirchenjahr gibt es höchstens einen Import. Eine andere Ausgabe desselben Jahres ergibt einen Konflikt, ohne Daten zu überschreiben. Die Datei und alle Datensätze werden gemeinsam transaktional gespeichert. Der Quellenname wird auf den Dateinamen ohne Pfad reduziert. `GET /api/v1/imports/{id}/source` liefert das archivierte PDF.
 
@@ -55,3 +55,5 @@ python -m verkuendigungen export data/heilige-2026-27.csv
 ```
 
 Ein anderer Datenbankpfad lässt sich vor dem Unterbefehl über `--db` angeben oder über `VERKUENDIGUNGEN_DB` konfigurieren.
+
+Fehlende Kalendertage verhindern den Import nicht, sofern mindestens 90 % des Kirchenjahres erkannt wurden. Der Importbericht enthält `missing_dates` (ISO-Daten) und `expected_calendar_days`. Die Oberfläche zeigt die Lücken nach dem Upload und dauerhaft bei den vorhandenen Directorien an. Für fehlende Tage entstehen keine erfundenen Feiern oder Quellenabschnitte.

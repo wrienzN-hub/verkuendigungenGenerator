@@ -60,8 +60,8 @@ class UploadTests(unittest.TestCase):
         self.assertEqual(self.upload(out.getvalue()).status_code,409)
         self.assertEqual(len(self.client.get('/api/v1/imports').json()),1)
 
-    def test_invalid_and_incomplete_documents_do_not_write_partial_data(self):
-        for data in (b'not a pdf',b'%PDF-broken',directorium_pdf(omit='2028-01-01'),directorium_pdf(wrong_weekday=True),directorium_pdf(encrypted=True)):
+    def test_invalid_documents_do_not_write_partial_data(self):
+        for data in (b'not a pdf',b'%PDF-broken',directorium_pdf(wrong_weekday=True),directorium_pdf(encrypted=True)):
             with self.subTest(length=len(data)):
                 response=self.upload(data)
                 self.assertEqual(response.status_code,422,response.text)
@@ -71,6 +71,26 @@ class UploadTests(unittest.TestCase):
         with patch('verkuendigungen.api.routes.imports.MAX_UPLOAD_BYTES',64):
             self.assertEqual(self.upload(self.pdf).status_code,413)
         self.assertEqual(self.client.get('/api/v1/imports/99/source').status_code,404)
+
+    def test_missing_day_is_imported_with_persistent_warning_without_invented_entries(self):
+        data=directorium_pdf(omit='2028-01-01')
+        response=self.upload(data)
+        self.assertEqual(response.status_code,201,response.text)
+        report=response.json()
+        self.assertEqual(report['missing_dates'],['2028-01-01'])
+        self.assertEqual(report['expected_calendar_days'],371)
+        self.assertEqual(report['calendar_days'],370)
+        self.assertIn('01.01.2028',report['warnings'][0])
+        self.assertEqual(self.client.get('/api/v1/saints?start=2028-01-01&end=2028-01-01').json(),[])
+        self.assertEqual(self.client.get('/api/v1/imports').json()[0]['report']['missing_dates'],['2028-01-01'])
+        self.assertEqual(self.upload(data).json()['missing_dates'],['2028-01-01'])
+        with database(self.path) as conn:
+            self.assertEqual(conn.execute("SELECT count(*) FROM calendar_days WHERE calendar_date='2028-01-01'").fetchone()[0],0)
+
+    def test_mostly_unrecognized_calendar_is_rejected(self):
+        from verkuendigungen.services.directorium import extract_blocks
+        with self.assertRaisesRegex(ValueError,'90 %'):
+            extract_blocks(['NOVEMBER 2026\n29 So + 1. ADVENTSONNTAG\nOff vom So'])
 
     def test_review_migration_keeps_ids_and_activation(self):
         legacy=Path(self.temp.name)/'legacy.sqlite3'

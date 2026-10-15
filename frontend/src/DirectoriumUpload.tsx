@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { BookOpen, Check, FileText, Upload, X, ExternalLink } from 'lucide-react';
 import { request } from './api';
+import { formatDate } from './labels';
 
 type ImportRun = {
   id: number;
   source_file: string;
   liturgical_year: string;
   has_source: boolean;
-  report: { celebrations: number };
+  report: { celebrations: number; missing_dates?: string[] };
 };
 type ImportResult = {
   already_imported: boolean;
@@ -15,6 +16,7 @@ type ImportResult = {
   import_run_id: number;
   celebrations: number;
   calendar_days: number;
+  missing_dates?: string[];
   start: string;
   end: string;
 };
@@ -128,6 +130,19 @@ export default function DirectoriumUpload({
                 verfügbar.
               </p>
               <small>Bereits vorhandene Änderungen bleiben erhalten.</small>
+              {!!result.missing_dates?.length && (
+                <div className="import-warning">
+                  <strong>Hinweis: Lücken im Directorium</strong>
+                  <p>
+                    Für {result.missing_dates.length} Kalendertag(e) fehlt ein Quellenabschnitt:
+                  </p>
+                  <p>{result.missing_dates.map(formatDate).join(', ')}</p>
+                  <p>
+                    Die vorhandenen Einträge wurden importiert. Für fehlende Tage wurden keine
+                    Heiligen oder Feste ergänzt.
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             <>
@@ -194,6 +209,14 @@ export default function DirectoriumUpload({
                     <strong>{run.liturgical_year}</strong>
                     <span>{run.source_file}</span>
                     <small>{run.report.celebrations} Einträge</small>
+                    {!!run.report.missing_dates?.length && (
+                      <details className="history-warning">
+                        <summary>
+                          {run.report.missing_dates.length} Kalendertag(e) ohne Quellenabschnitt
+                        </summary>
+                        <p>{run.report.missing_dates.map(formatDate).join(', ')}</p>
+                      </details>
+                    )}
                   </div>
                   {run.has_source && (
                     <a

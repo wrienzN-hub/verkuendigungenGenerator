@@ -1375,3 +1375,34 @@ tbody tr:hover {
   font-size: 11px;
   color: #8c9b7f;
 }
+
+.import-warning {
+  text-align: left;
+  margin-top: 20px;
+  padding: 15px;
+  border: 1px solid #e7d5a7;
+  background: #fff9ea;
+  border-radius: 7px;
+  color: #8a6c2e;
+}
+.import-warning strong {
+  font-size: 12px;
+}
+.upload-result .import-warning p {
+  font-size: 11px;
+  color: #8a6c2e;
+  margin: 8px 0 0;
+}
+.history-warning {
+  font-size: 10px;
+  color: #94733a;
+  margin-top: 8px;
+}
+.history-warning summary {
+  cursor: pointer;
+}
+.history-warning p {
+  font-size: 10px;
+  color: #94733a;
+  margin: 7px 0 0;
+}

@@ -86,7 +86,7 @@ Import und Tests:
 
 - HTTP 413: Datei zu groß.
 - HTTP 415: keine PDF-Dateiendung.
-- HTTP 422: beschädigtes, verschlüsseltes, unlesbares oder nicht unterstütztes PDF; unvollständiges Kalendarium oder falsche Wochentage.
+- HTTP 422: beschädigtes, verschlüsseltes, unlesbares oder nicht unterstütztes PDF; weitgehend nicht erkanntes Kalendarium oder falsche Wochentage.
 - HTTP 409: eine andere Ausgabe für dasselbe Kirchenjahr ist bereits vorhanden.
 
 ```powershell
@@ -94,3 +94,5 @@ curl.exe -F "file=@resources/directorium-2026-27-kern_21092026.pdf" http://127.0
 ```
 
 `GET /api/v1/imports/{id}/source` liefert das gespeicherte Original-PDF. Die Liste `/api/v1/imports` enthält `has_source`, aber keine PDF-Binärdaten. Es gibt keine Prüfstatusfelder mehr.
+
+Fehlende Kalendertage verhindern den Import nicht, sofern mindestens 90 % des Kirchenjahres erkannt wurden. Der Importbericht enthält `missing_dates` (ISO-Daten) und `expected_calendar_days`. Die Oberfläche zeigt die Lücken nach dem Upload und dauerhaft bei den vorhandenen Directorien an. Für fehlende Tage entstehen keine erfundenen Feiern oder Quellenabschnitte.

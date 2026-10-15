@@ -15,7 +15,7 @@ from ..core.config import ROOT
 from ..infrastructure.database import migrate
 
 SOURCE = ROOT / "resources/directorium-2026-27-kern_21092026.pdf"
-PARSER_VERSION = "gurk-monthly-v3"
+PARSER_VERSION = "gurk-monthly-v4"
 SOURCE_SHA256 = 'e44ce1c4b155a77ca6f36b1ae0c5d8f4495c4e3207a63ce0ab84d1a12b761f4a'
 YEAR = "2026/27"
 START, END = date(2026, 11, 29), date(2027, 11, 27)
@@ -104,9 +104,10 @@ def extract_blocks(pages, start=START, end=END):
         blocks.append(current)
     expected = {(start + timedelta(days=i)).isoformat() for i in range((end-start).days+1)}
     actual = {b['date'] for b in blocks}
-    if actual != expected:
-        missing = sorted(expected-actual)
-        raise ValueError(f'Kalendarium unvollständig: {len(missing)} Tage fehlen (z. B. {", ".join(missing[:5])}). Das PDF-Layout wird möglicherweise nicht unterstützt.')
+    # Einzelne Lücken in der Quelle sind zulässig. Eine weitgehend nicht
+    # erkannte Ausgabe bleibt ein Layoutfehler, statt als Import zu gelten.
+    if len(actual) < len(expected) * 0.9:
+        raise ValueError('Weniger als 90 % der Kalendertage erkannt. Das PDF ist unvollständig oder sein Layout wird nicht unterstützt.')
     return blocks
 
 
@@ -203,7 +204,7 @@ def parse_block(block, *, known_edition=True):
     for page, line in block['lines']:
         if re.search(r"\bOff\b", line) or re.match(r"^(?:[WRV]|GR|V/ROSA)\s+(?:M\b|DIE FEIER)", line):
             prefix = re.match(r"^([HFGg])\s+Off\b", line)
-            if prefix:
+            if prefix and prefix[1] != 'g':
                 header.append((page, prefix[1]))
             break
         header.append((page, line))
@@ -248,7 +249,7 @@ def parse_block(block, *, known_edition=True):
     for idx, (page, line) in enumerate(header):
         if re.search(r"entf(?:ällt|allen) in diesem Jahr", line):
             start = idx
-            if idx > 0 and (line.startswith('KLAGENFURT ') or line.startswith('entf')):
+            if idx > 0 and (line.startswith('KLAGENFURT ') or line.startswith('entf') or header[idx-1][1].endswith(('Hl.','HL.','Hll.','HLL.'))):
                 start = idx - 1
             text = join_lines([l for _, l in header[start:idx+1]])
             text = re.sub(r'^[HFGg]\s+', '', text)
@@ -323,6 +324,8 @@ def parse_block(block, *, known_edition=True):
             elif title.startswith(('GRÜNDONNERSTAG','KARFREITAG','KARSAMSTAG')):
                 rank = 'triduum'
             elif title.startswith('ASCHERMITTWOCH'):
+                rank = 'privileged_weekday'
+            elif title.startswith('PFINGSTMONTAG'):
                 rank = 'privileged_weekday'
             elif title.startswith('ALLERSEELEN'):
                 rank = 'commemoration'
@@ -406,12 +409,22 @@ def import_pdf(conn, source=SOURCE, *, pdf_bytes=None, filename=None):
     if not any(records for _,records,_ in parsed):
         raise ValueError('Keine liturgischen Feiern erkannt. Dieses PDF-Layout wird nicht unterstützt.')
     counts = Counter(r['observance_status'] for _, records, _ in parsed for r in records)
+    present_dates = {b['date'] for b in blocks}
+    expected_dates = {(start+timedelta(days=i)).isoformat() for i in range((end-start).days+1)}
+    missing_dates = sorted(expected_dates-present_dates)
+    gap_warnings = []
+    if missing_dates:
+        shown = ', '.join(date.fromisoformat(d).strftime('%d.%m.%Y') for d in missing_dates[:5])
+        gap_warnings.append(f'Für {len(missing_dates)} Kalendertag(e) wurde kein Quellenabschnitt gefunden: {shown}'
+                            + (' …' if len(missing_dates)>5 else '')
+                            + '. Die vorhandenen Einträge wurden importiert; für die fehlenden Tage wurden keine Feiern ergänzt.')
     report = {
         'source_pages': len(pages), 'calendar_days': len({b['date'] for b in blocks}),
+        'expected_calendar_days': len(expected_dates), 'missing_dates': missing_dates,
         'calendar_blocks': len(blocks), 'celebrations': sum(counts.values()),
         'liturgical_year': year,
         'by_status': dict(counts), 'start': start.isoformat(), 'end': end.isoformat(),
-        'warnings': ([
+        'warnings': gap_warnings + ([
             'Die Quelle enthält widersprüchliche Übersichten (Lesejahr A/B; Fronleichnam und Herz-Jesu-Termine). Importiert wurden die datierten Tagesabschnitte.',
         ] if digest == SOURCE_SHA256 else []) + [
             'Rangcodes ersetzen keine vollständige Vorrangberechnung. Örtliche Sonderfälle sind bedingt verfügbar.',

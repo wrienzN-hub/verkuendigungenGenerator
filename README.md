@@ -39,7 +39,7 @@ cd ..
 
 In der Heiligenverwaltung auf **Directorium hochladen** klicken und ein PDF auswählen. Unterstützt werden Directorien der Diözese Gurk mit lesbarem Text, einer Kirchenjahresangabe und Monats-/Tagesabschnitten wie in der vorhandenen Ausgabe. Die Obergrenze beträgt 25 MB. Scans ohne Textebene und abweichende Layouts werden mit einer Fehlermeldung abgelehnt.
 
-Der Import ermittelt den Zeitraum vom ersten Adventssonntag bis zum Samstag vor dem nächsten Kirchenjahr und verlangt vollständige Kalendertage mit passenden Wochentagen. Dieselbe Datei wird nur einmal importiert. Eine andere Datei für dasselbe Kirchenjahr überschreibt keine bestehenden Änderungen. Die Originaldatei bleibt in der Datenbank gespeichert.
+Der Import ermittelt den Zeitraum vom ersten Adventssonntag bis zum Samstag vor dem nächsten Kirchenjahr und prüft die erkannten Kalendertage auf passende Wochentage. Dieselbe Datei wird nur einmal importiert. Eine andere Datei für dasselbe Kirchenjahr überschreibt keine bestehenden Änderungen. Die Originaldatei bleibt in der Datenbank gespeichert.
 
 Alternativ über die CLI:
 
@@ -70,3 +70,5 @@ cd frontend
 pnpm build
 pnpm format:check
 ```
+
+Fehlende Kalendertage verhindern den Import nicht, sofern mindestens 90 % des Kirchenjahres erkannt wurden. Der Importbericht enthält `missing_dates` (ISO-Daten) und `expected_calendar_days`. Die Oberfläche zeigt die Lücken nach dem Upload und dauerhaft bei den vorhandenen Directorien an. Für fehlende Tage entstehen keine erfundenen Feiern oder Quellenabschnitte.

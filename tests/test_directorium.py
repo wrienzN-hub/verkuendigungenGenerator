@@ -6,7 +6,7 @@ from pathlib import Path
 
 from verkuendigungen.infrastructure.database import database, migrate
 from verkuendigungen.repositories.saints import list_celebrations, set_disabled
-from verkuendigungen.services.directorium import celebration_name, import_pdf
+from verkuendigungen.services.directorium import celebration_name, import_pdf, parse_block
 
 
 class DirectoriumImportTests(unittest.TestCase):
@@ -91,6 +91,17 @@ class DirectoriumImportTests(unittest.TestCase):
     def test_migrations_can_be_repeated(self):
         migrate(self.conn)
         self.assertEqual(self.conn.execute('PRAGMA user_version').fetchone()[0], 2)
+
+    def test_older_edition_rank_without_named_commemoration(self):
+        block={'date':'2026-02-07','weekday':'Sa','title':'der 4. Woche im Jahreskreis','context':'','lines':[(81,'der 4. Woche im Jahreskreis'),(81,'g Off vom Tag oder vom g')]}
+        self.assertEqual(parse_block(block,known_edition=False)[0],[])
+
+    def test_older_pentecost_monday_and_wrapped_suppressed_saints(self):
+        block={'date':'2026-05-25','weekday':'Mo','title':'PFINGSTMONTAG','context':'','lines':[(136,line) for line in ['PFINGSTMONTAG','BINKOŠTNI PONEDELJEK','g Maria, Mutter der Kirche','Hl. Beda der Ehrwürdige, Hl. Gregor VII. und Hl.','Maria Magdalena de Pazzi entfallen in diesem Jahr.','Off vom Tag, 4. Woche, oder vom G (Com Maria)']]}
+        rows=parse_block(block,known_edition=False)[0]
+        self.assertTrue(any(r['name']=='PFINGSTMONTAG' for r in rows))
+        suppressed=next(r for r in rows if r['observance_status']=='suppressed')
+        self.assertIn('Beda',suppressed['name']);self.assertIn('Maria Magdalena',suppressed['name'])
 
     def test_name_cleanup_preserves_multiple_saints_and_identifying_aliases(self):
         examples = {
