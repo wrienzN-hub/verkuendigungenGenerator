@@ -2,8 +2,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
-from ..core.config import database_path
+from ..core.config import ROOT, database_path
 from ..infrastructure.database import database, migrate
 from .routes import imports, saints
 
@@ -30,6 +31,10 @@ def create_app(db_path: Path | str | None = None):
         with database(app.state.database_path) as conn:
             conn.execute('SELECT 1').fetchone()
         return {'status': 'ok'}
+
+    frontend = ROOT / 'frontend' / 'dist'
+    if frontend.is_dir():
+        app.mount('/', StaticFiles(directory=frontend, html=True), name='frontend')
 
     return app
 

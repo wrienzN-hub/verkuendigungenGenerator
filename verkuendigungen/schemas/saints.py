@@ -1,12 +1,29 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, StrictBool
+from pydantic import BaseModel, ConfigDict, StrictBool, Field, model_validator
+
+Rank = Literal['H','F','G','g','sunday','privileged_weekday','triduum','octave','commemoration']
+Observance = Literal['observed','optional','commemoration_only','suppressed','conditional']
 
 
 class SaintUpdate(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-    disabled: StrictBool
+    model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
+    disabled: StrictBool | None = None
+    name: str | None = Field(default=None,min_length=1,max_length=500)
+    name_sl: str | None = Field(default=None,max_length=500)
+    rank_code: Rank | None = None
+    observance_status: Observance | None = None
+    applicability_note: str | None = Field(default=None,max_length=5000)
+
+    @model_validator(mode='after')
+    def validate_patch(self):
+        if not self.model_fields_set:
+            raise ValueError('Mindestens ein Feld ist erforderlich.')
+        for field in self.model_fields_set - {'name_sl','rank_code','applicability_note'}:
+            if getattr(self,field) is None:
+                raise ValueError(f'{field} darf nicht null sein.')
+        return self
 
 
 class Saint(BaseModel):
@@ -26,6 +43,11 @@ class Saint(BaseModel):
     source_page: int
     source_reference: str
     source_text: str
-    review_status: str
-    review_notes: str
     updated_at: datetime
+
+
+class SaintPage(BaseModel):
+    items: list[Saint]
+    total: int
+    limit: int
+    offset: int

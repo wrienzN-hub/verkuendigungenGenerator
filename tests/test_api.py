@@ -55,7 +55,7 @@ class ApiTests(unittest.TestCase):
             self.assertIs(response.json()['disabled'], True)
             self.assertIs(self.client.get(url).json()['disabled'], True)
             self.assertEqual(self.client.patch(url, json={'disabled': 1}).status_code, 422)
-            self.assertEqual(self.client.patch(url, json={'disabled': False, 'name': 'x'}).status_code, 422)
+            self.assertEqual(self.client.patch(url, json={'disabled': False, 'source_text': 'x'}).status_code, 422)
         finally:
             self.client.patch(url, json={'disabled': False})
 
@@ -70,3 +70,34 @@ class ApiTests(unittest.TestCase):
         response = self.client.get('/api/v1/imports')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()[0]['report']['celebrations'], 377)
+
+    def test_filtered_paging_returns_matching_count(self):
+        response=self.client.get('/api/v1/saints/page',params={'month':12,'rank':'g','limit':2})
+        self.assertEqual(response.status_code,200)
+        data=response.json()
+        self.assertEqual(len(data['items']),2)
+        self.assertGreater(data['total'],2)
+        self.assertTrue(all(r['rank_code']=='g' and r['celebration_date'][5:7]=='12' for r in data['items']))
+        self.assertEqual(self.client.get('/api/v1/saints/page?month=13').status_code,422)
+        self.assertEqual(self.client.get('/api/v1/saints/page?rank=invalid').status_code,422)
+        self.assertEqual(self.client.get('/api/v1/saints/filters').json()['years'],['2026/27'])
+
+    def test_editable_fields_preserve_source_and_reject_invalid_patches(self):
+        url='/api/v1/saints/1'
+        original=self.client.get(url).json()
+        changes={'name':'Neuer Name','name_sl':'Slovensko ime','rank_code':'F','observance_status':'conditional','applicability_note':'Nur örtlich'}
+        try:
+            result=self.client.patch(url,json=changes)
+            self.assertEqual(result.status_code,200)
+            for key,value in changes.items(): self.assertEqual(result.json()[key],value)
+            self.assertEqual(result.json()['source_text'],original['source_text'])
+            for bad in ({'name':'  '},{'name':None},{'disabled':None},{'rank_code':'X'},{}, {'review_status':'reviewed'}, {'review_notes':'x'}):
+                self.assertEqual(self.client.patch(url,json=bad).status_code,422,bad)
+        finally:
+            self.client.patch(url,json={key:original[key] for key in changes})
+
+    def test_unicode_search_and_disable_filter(self):
+        rows=self.client.get('/api/v1/saints/page',params={'search':'ÄMILIANI'}).json()['items']
+        self.assertEqual(len(rows),1)
+        self.assertIn('Ämiliani',rows[0]['name'])
+        self.assertEqual(self.client.get('/api/v1/saints/page?search=not-a-saint-xyz').json()['total'],0)

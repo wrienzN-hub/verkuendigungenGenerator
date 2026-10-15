@@ -49,7 +49,7 @@ def main():
                 writer.writerows(rows)
             print(f'{len(rows)} Einträge exportiert: {args.output}')
         elif args.command == 'status':
-            print(json.dumps([dict(r) for r in conn.execute('SELECT * FROM import_runs')], ensure_ascii=False, indent=2))
+            print(json.dumps([dict(r) for r in conn.execute('SELECT id,source_file,source_sha256,liturgical_year,parser_version,imported_at,report_json FROM import_runs')], ensure_ascii=False, indent=2))
 
 
 if __name__ == '__main__':

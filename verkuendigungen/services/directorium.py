@@ -1,13 +1,10 @@
-"""Nachvollziehbarer Import der vorhandenen Directorium-Ausgabe 2026/27.
-
-Die Extraktion ist bewusst editionsgebunden. Abweichende Kalenderstrukturen
-werden nicht stillschweigend mit denselben Annahmen interpretiert.
-"""
+"""Directorien der Diözese Gurk mit datierten Monatsabschnitten importieren."""
 
 import hashlib
 import json
 import re
 import unicodedata
+from io import BytesIO
 from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
@@ -18,17 +15,18 @@ from ..core.config import ROOT
 from ..infrastructure.database import migrate
 
 SOURCE = ROOT / "resources/directorium-2026-27-kern_21092026.pdf"
-PARSER_VERSION = "gurk-2026-27-v1"
+PARSER_VERSION = "gurk-monthly-v3"
 SOURCE_SHA256 = 'e44ce1c4b155a77ca6f36b1ae0c5d8f4495c4e3207a63ce0ab84d1a12b761f4a'
 YEAR = "2026/27"
 START, END = date(2026, 11, 29), date(2027, 11, 27)
 MONTHS = {
     "NOVEMBER": 11, "DEZEMBER": 12, "JÄNNER": 1, "FEBER": 2,
     "MÄRZ": 3, "APRIL": 4, "MAI": 5, "JUNI": 6, "JULI": 7,
+    "JANUAR": 1, "FEBRUAR": 2,
     "AUGUST": 8, "SEPTEMBER": 9, "OKTOBER": 10,
 }
 DAY = re.compile(r"^(\d{1,2})\s+(Mo|Di|Mi|Do|Fr|Sa|So)\s+(.+)$")
-MONTH = re.compile(r"^(" + "|".join(MONTHS) + r")\s+(2026|2027)$")
+MONTH = re.compile(r"^(" + "|".join(MONTHS) + r")\s+(20\d{2})$", re.I)
 RANK = re.compile(r"^([HFGg])(?:\s+(.*))?$")
 SUPPRESSED = re.compile(r"(.+?)\s+entf(?:ällt|allen)\s+in diesem Jahr\.", re.I)
 WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
@@ -43,17 +41,41 @@ def join_lines(lines):
     return clean(re.sub(r"-\n(?=[a-zäöüßčšž])", "", "\n".join(lines)))
 
 
-def extract_blocks(pages):
+class ImportConflict(ValueError):
+    """Eine andere Ausgabe für dieses Kirchenjahr ist bereits vorhanden."""
+
+
+def first_advent(year):
+    earliest = date(year, 11, 27)
+    return earliest + timedelta(days=(6 - earliest.weekday()) % 7)
+
+
+def detect_year(pages):
+    front = '\n'.join(pages[:6])
+    if not re.search(r'Gurk|Krška', front, re.I):
+        raise ValueError('Das PDF ist kein erkennbares Directorium der Diözese Gurk.')
+    years = set()
+    for match in re.finditer(r'\b(20\d{2})\s*/\s*(20\d{2}|\d{2})\b', front):
+        first = int(match[1])
+        second = int(match[2]) if len(match[2]) == 4 else 2000 + int(match[2])
+        if second == first + 1:
+            years.add(first)
+    if len(years) != 1:
+        raise ValueError('Das Kirchenjahr konnte auf den ersten PDF-Seiten nicht eindeutig erkannt werden.')
+    first = years.pop()
+    return f'{first}/{str(first+1)[-2:]}', first_advent(first), first_advent(first+1)-timedelta(days=1)
+
+
+def extract_blocks(pages, start=START, end=END):
     blocks, current = [], None
+    month = year = None
     for page_num, text in enumerate(pages, 1):
-        # Nur das eigentliche Kalendarium, nicht Einleitung oder Jahrestafel.
-        if not 54 <= page_num <= 225:
-            continue
         month_matches = [MONTH.fullmatch(line.strip()) for line in text.splitlines()]
         month_match = next((m for m in month_matches if m), None)
-        if month_match is None:
-            raise ValueError(f"Monatsüberschrift auf PDF-Seite {page_num} fehlt.")
-        month, year = MONTHS[month_match[1]], int(month_match[2])
+        if month_match:
+            month, year = MONTHS[month_match[1].upper()], int(month_match[2])
+        if month is None:
+            continue
         lines = text.splitlines()
         for index, raw_line in enumerate(lines):
             line = clean(raw_line)
@@ -62,11 +84,13 @@ def extract_blocks(pages):
             match = DAY.fullmatch(line)
             if match:
                 day_date = date(year, month, int(match[1]))
-                if not START <= day_date <= END:
-                    raise ValueError(f"Datum außerhalb des Kirchenjahres: {day_date}")
+                if not start <= day_date <= end:
+                    continue
                 if WEEKDAYS[day_date.weekday()] != match[2]:
                     raise ValueError(f"Wochentag stimmt nicht: {day_date} ({match[2]})")
                 if current:
+                    if day_date.isoformat() < current['date']:
+                        raise ValueError(f'Kalenderabschnitte sind nicht chronologisch: {day_date}.')
                     blocks.append(current)
                 context = " ".join(clean(x) for x in lines[max(0, index-3):index])
                 current = {
@@ -78,15 +102,11 @@ def extract_blocks(pages):
                 current["lines"].append((page_num, line))
     if current:
         blocks.append(current)
-    expected = {(START + timedelta(days=i)).isoformat() for i in range((END-START).days+1)}
+    expected = {(start + timedelta(days=i)).isoformat() for i in range((end-start).days+1)}
     actual = {b['date'] for b in blocks}
     if actual != expected:
-        raise ValueError(f"Kalendarium unvollständig: fehlend={sorted(expected-actual)}, zusätzlich={sorted(actual-expected)}")
-    if len(blocks) != len(expected) + 1:
-        raise ValueError("Unerwartete Anzahl Kalenderabschnitte (25. Oktober hat zwei Varianten).")
-    duplicates = {d: c for d, c in Counter(b['date'] for b in blocks).items() if c > 1}
-    if duplicates != {"2027-10-25": 2}:
-        raise ValueError(f"Unerwartete Datumsvarianten: {duplicates}")
+        missing = sorted(expected-actual)
+        raise ValueError(f'Kalendarium unvollständig: {len(missing)} Tage fehlen (z. B. {", ".join(missing[:5])}). Das PDF-Layout wird möglicherweise nicht unterstützt.')
     return blocks
 
 
@@ -122,7 +142,62 @@ def kind_for(name, rank):
     return 'feast'
 
 
-def parse_block(block):
+def celebration_name(text):
+    """Berufs-/Standesangaben entfernen; gemeinsame Namen erhalten."""
+    if text is None:
+        return None
+    if text == 'Maria, Mutter der Kirche':
+        return text  # Eigenständiger Name des Mariengedenktags.
+    text = re.sub(r'\s*\((?:RK|DK|GK|ÖBK|Verlegung|vgl\b)[^)]*\)', '', text)
+    roles = re.compile(
+        r'^(?:Priester|Ordenspriester|Ordensmann|Ordensfrau|Ordensbruder|Ordensgründer|'
+        r'Kirchenlehrer|Kirchenlehrerin|Bisch(?:of|öfe)|Abtbischof|Abt|Äbtissin|Papst|Diakon|'
+        r'Märtyrer|Märtyrin|Jungfrau|Glaubensbote|Glaubensboten|Einsiedler|Mönch|'
+        r'Mystiker|Mystikerin|König|Kaiser|Herzog|Landgr[aä]f|Markgraf|Reichskanzler|Lordkanzler|'
+        r'Philosoph|Familienvater|Ehefrau|Mutter|Stifterin|Schutzpatron|Patronin|'
+        r'Eltern|Bräutigam|Apostel|Apostolin|Evangelist|Erzengel|Friedensstifter|Seelsorger|'
+        r'Witwe|Volksprediger|Wanderprediger|Gründer|Pfarrer|'
+        r'Pries\s+ter|erster Märtyrer|erste[rn]? Märtyrer|'
+        r'apostol|redovnic|redovnik|devica|cerkvena učiteljica|sozavetnica|'
+        r'menih|škof|zavetnik|zavetnica|diakon|mučen|muoeenica|ustanovitelj|'
+        r'prvi mučenec|ženin|mati\b|nadangeli)', re.I,
+    )
+    parts = []
+    for part in text.split(','):
+        part = part.strip()
+        if not part:
+            continue
+        if parts and roles.match(part):
+            # Manche Namen stehen im selben Abschnitt hinter einer Funktion.
+            following = re.search(r'\b(?:und\s+(?:h[lL][lL]?\.?\s+)|und\s+hll\.\s+).+', part)
+            if following:
+                parts.append(following[0])
+            continue
+        parts.append(part)
+    result = ''
+    for part in parts:
+        result += ((' ' if re.match(r'^(?:und|in)\b', part) else ', ') if result else '') + part
+    return clean(result)
+
+
+def refresh_import_names(conn, run_id):
+    """Bestehenden Import ohne neue IDs oder Verlust manueller Schalter anpassen."""
+    rows = conn.execute(
+        'SELECT s.id,s.name,s.name_sl FROM saints s JOIN calendar_days d ON d.id=s.calendar_day_id WHERE d.import_run_id=?',
+        (run_id,),
+    ).fetchall()
+    changed = 0
+    with conn:
+        for row in rows:
+            name, name_sl = celebration_name(row['name']), celebration_name(row['name_sl'])
+            if (name, name_sl) != (row['name'], row['name_sl']):
+                conn.execute("UPDATE saints SET name=?,name_sl=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?", (name, name_sl, row['id']))
+                changed += 1
+        conn.execute('UPDATE import_runs SET parser_version=? WHERE id=?', (PARSER_VERSION, run_id))
+    return changed
+
+
+def parse_block(block, *, known_edition=True):
     # Die Überschriften stehen vor der ersten Offiziums-/Messanweisung.
     header = []
     for page, line in block['lines']:
@@ -162,7 +237,7 @@ def parse_block(block):
             if 'Kommemoration' in off_text:
                 status = 'commemoration_only'
             # Scholastika steht ausdrücklich bei Aschermittwoch ohne Erklärung.
-            if block['date'] == '2027-02-10':
+            if known_edition and block['date'] == '2027-02-10':
                 status = 'suppressed'
             add(text, rank, optional['page'], status)
             optional = None
@@ -237,15 +312,15 @@ def parse_block(block):
     title = join_lines(primary_lines)
     # Normale Wochentage werden in calendar_days/source_day_blocks geführt.
     is_weekday = bool(re.match(r'^(?:der |nach |DER KARWOCHE)', title))
-    if block['date'] == '2027-03-15':
-        title = re.sub(r'^der 5\. Fastenwoche\s+', '', title)
+    if 'FEST DES DORNENGEKRÖNTEN' in title:
+        title = re.sub(r'^der \d+\. Fastenwoche\s+', '', title)
         is_weekday = False
     if not is_weekday:
         rank = primary_rank
         if rank is None:
             if 'DER OSTEROKTAV' in title or 'WEIHNACHTSOKTAV' in title or title.startswith('OSTERMONTAG'):
                 rank = 'octave'
-            elif block['date'] in ('2027-03-25','2027-03-26','2027-03-27'):
+            elif title.startswith(('GRÜNDONNERSTAG','KARFREITAG','KARSAMSTAG')):
                 rank = 'triduum'
             elif title.startswith('ASCHERMITTWOCH'):
                 rank = 'privileged_weekday'
@@ -256,10 +331,10 @@ def parse_block(block):
             else:
                 raise ValueError(f"Rang fehlt: {block['date']} {title}")
         status, note = 'observed', None
-        if block['date'] == '2027-10-25':
+        if 'JAHRESTAG DER KIRCHWEIHE' in title and 'ihren Weihetag nicht kennen' in block['context']:
             status, note = 'conditional', 'Nur für Kirchen, die ihren Weihetag nicht kennen.'
         add(title, rank, primary_page, status, note)
-        if block['date'] == '2027-03-28':
+        if 'HOCHFEST DER AUFERSTEHUNG DES HERRN' in title and 'OSTERSONNTAG' in title:
             records[-1]['name'] += ' – OSTERSONNTAG'
             records[-1]['name_sl'] = 'VELIKONOČNA NEDELJA'
     for page, name, raw in suppressed_names:
@@ -268,7 +343,7 @@ def parse_block(block):
         add(name, None, page, 'suppressed', raw)
 
     # Lokale Alternativen, deren Rang und Geltungsbereich im Text erläutert sind.
-    if block['date'] == '2027-05-17':
+    if block['title'] == 'PFINGSTMONTAG' and any('Maria, Mutter der Kirche' in line for _,line in header):
         records = [r for r in records if r['name'] != 'Maria, Mutter der Kirche']
         # Pfingstmontag und der Mariengedenktag sind eigenständige Alternativen.
         for record in records:
@@ -278,66 +353,75 @@ def parse_block(block):
                 record['rank_code'] = 'privileged_weekday'
         add('Maria, Mutter der Kirche', 'G', primary_page, 'conditional',
             'Directorium: gewohnte liturgische Ordnung des Pfingstmontags bleibt bestehen; örtliche Auswahl beachten.')
-    if block['date'] == '2027-09-19':
+    if any(line.startswith('Im Dom zu Klagenfurt: H') for _,line in header):
         records = [r for r in records if r['name'] != 'JAHRESTAG DER WEIHE DES DOMES ZU KLAGENFURT']
         add('JAHRESTAG DER WEIHE DES DOMES ZU KLAGENFURT', 'H', primary_page,
             'conditional', 'Nur im Dom zu Klagenfurt; außerhalb entfällt die Feier in diesem Jahr.')
     # Das Fest des Dornenhauptes ist in St. Egid örtlich ein Hochfest.
-    if block['date'] == '2027-03-15':
+    if 'FEST DES DORNENGEKRÖNTEN' in title:
         for r in records:
             if r['rank_code'] == 'F':
                 r['applicability_note'] = 'In der Stadthauptpfarrkirche St. Egid in Klagenfurt im Rang H.'
                 r['name_sl'] = 'PRAZNIK S TRNJEM KRONANE GLAVE'
-    if block['date'] == '2027-03-25':
+    if title.startswith('GRÜNDONNERSTAG'):
         for r in records:
             if r['rank_code'] == 'triduum':
                 r['name'] = 'GRÜNDONNERSTAG oder HOHER DONNERSTAG'
                 r['name_sl'] = 'VELIKI ČETRTEK'
     for r in records:
-        r['review_notes'] = ''
-        if r['name'].startswith('Hl. Scholastika'):
-            r['review_notes'] = 'Am Aschermittwoch verdrängt; Quelle druckt G ohne ausdrücklichen Entfallvermerk. Fachlich prüfen.'
-        if r['name_sl'] and 'muoeenica' in r['name_sl']:
-            r['review_notes'] = 'Auffällige Zeichenkodierung im slowenischen PDF-Text (muoeenica); vor Ausgabe sprachlich prüfen.'
+        r['name'] = celebration_name(r['name'])
+        r['name_sl'] = celebration_name(r['name_sl'])
     return records, '\n'.join(notes)
 
 
-def import_pdf(conn, source=SOURCE):
+def import_pdf(conn, source=SOURCE, *, pdf_bytes=None, filename=None):
     migrate(conn)
-    source = Path(source)
-    digest = hashlib.sha256(source.read_bytes()).hexdigest()
-    if digest != SOURCE_SHA256:
-        raise ValueError('Diese Datei ist nicht die unterstützte Directorium-Ausgabe. Für neue/geänderte Quellen muss der Importer geprüft werden.')
-    existing = conn.execute('SELECT id, report_json FROM import_runs WHERE source_sha256=?', (digest,)).fetchone()
+    data = Path(source).read_bytes() if pdf_bytes is None else pdf_bytes
+    source_name = (filename or Path(source).name).replace('\\','/').split('/')[-1]
+    digest = hashlib.sha256(data).hexdigest()
+    existing = conn.execute('SELECT id, liturgical_year, parser_version, report_json FROM import_runs WHERE source_sha256=?', (digest,)).fetchone()
     if existing:
-        return {'already_imported': True, 'import_run_id': existing['id'], **json.loads(existing['report_json'])}
-    if conn.execute('SELECT 1 FROM import_runs WHERE liturgical_year=?', (YEAR,)).fetchone():
-        raise ValueError('Für 2026/27 existiert bereits eine andere Quelle. Kein automatisches Überschreiben.')
-    reader = PdfReader(source)
-    if len(reader.pages) != 227:
-        raise ValueError('Dieser Importer unterstützt nur das vorhandene 227-seitige Directorium 2026/27.')
-    pages = [p.extract_text() for p in reader.pages]
-    if '2026/2027' not in pages[0] or 'Gurk' not in pages[0]:
-        raise ValueError('Unerwartete Directorium-Ausgabe.')
-    blocks = extract_blocks(pages)
-    parsed = [(b, *parse_block(b)) for b in blocks]
+        changed = refresh_import_names(conn, existing['id']) if existing['parser_version'] == 'gurk-2026-27-v1' else 0
+        with conn:
+            conn.execute('UPDATE import_runs SET source_pdf=coalesce(source_pdf,?) WHERE id=?', (data,existing['id']))
+        return {'already_imported': True, 'import_run_id': existing['id'], 'updated_names': changed, **json.loads(existing['report_json']), 'liturgical_year': existing['liturgical_year']}
+    if not data.startswith(b'%PDF-'):
+        raise ValueError('Die Datei ist kein gültiges PDF.')
+    try:
+        reader = PdfReader(BytesIO(data))
+        if reader.is_encrypted:
+            raise ValueError('Passwortgeschützte PDFs werden nicht unterstützt.')
+        if not 1 <= len(reader.pages) <= 1000:
+            raise ValueError('Das PDF muss zwischen 1 und 1000 Seiten enthalten.')
+        pages = [p.extract_text() or '' for p in reader.pages]
+    except ValueError:
+        raise
+    except Exception as exc:
+        raise ValueError('Das PDF kann nicht gelesen werden. Bitte eine unbeschädigte Datei mit auswählbarem Text hochladen.') from exc
+    year, start, end = detect_year(pages)
+    if conn.execute('SELECT 1 FROM import_runs WHERE liturgical_year=?', (year,)).fetchone():
+        raise ImportConflict(f'Für {year} ist bereits ein anderes Directorium importiert. Bestehende Daten werden nicht überschrieben.')
+    blocks = extract_blocks(pages, start, end)
+    parsed = [(b, *parse_block(b, known_edition=digest==SOURCE_SHA256)) for b in blocks]
+    if not any(records for _,records,_ in parsed):
+        raise ValueError('Keine liturgischen Feiern erkannt. Dieses PDF-Layout wird nicht unterstützt.')
     counts = Counter(r['observance_status'] for _, records, _ in parsed for r in records)
     report = {
         'source_pages': len(pages), 'calendar_days': len({b['date'] for b in blocks}),
         'calendar_blocks': len(blocks), 'celebrations': sum(counts.values()),
-        'by_status': dict(counts), 'start': START.isoformat(), 'end': END.isoformat(),
-        'review_status': 'needs_review',
-        'warnings': [
-            'Automatisch extrahiert und technisch geprüft; fachliche Freigabe steht aus.',
+        'liturgical_year': year,
+        'by_status': dict(counts), 'start': start.isoformat(), 'end': end.isoformat(),
+        'warnings': ([
             'Die Quelle enthält widersprüchliche Übersichten (Lesejahr A/B; Fronleichnam und Herz-Jesu-Termine). Importiert wurden die datierten Tagesabschnitte.',
+        ] if digest == SOURCE_SHA256 else []) + [
             'Rangcodes ersetzen keine vollständige Vorrangberechnung. Örtliche Sonderfälle sind bedingt verfügbar.',
             'Fehlende slowenische Texte sind NULL; keine automatisch erfundenen Übersetzungen.',
         ],
     }
     with conn:
         cursor = conn.execute(
-            'INSERT INTO import_runs(source_file,source_sha256,liturgical_year,parser_version,status,report_json) VALUES(?,?,?,?,?,?)',
-            (source.name, digest, YEAR, PARSER_VERSION, 'imported_needs_review', json.dumps(report, ensure_ascii=False)),
+            'INSERT INTO import_runs(source_file,source_sha256,liturgical_year,parser_version,report_json,source_pdf) VALUES(?,?,?,?,?,?)',
+            (source_name, digest, year, PARSER_VERSION, json.dumps(report, ensure_ascii=False), data),
         )
         run_id = cursor.lastrowid
         for num, text in enumerate(pages, 1):
@@ -348,7 +432,7 @@ def import_pdf(conn, source=SOURCE):
             day = block['date']
             if day not in day_ids:
                 c = conn.execute('INSERT INTO calendar_days(import_run_id,liturgical_year,calendar_date,weekday) VALUES(?,?,?,?)',
-                                 (run_id, YEAR, day, block['weekday']))
+                                 (run_id, year, day, block['weekday']))
                 day_ids[day] = c.lastrowid
             variants[day] += 1
             c = conn.execute('INSERT INTO source_day_blocks(calendar_day_id,variant,header_text,header_notes,source_page_start,source_page_end,raw_text) VALUES(?,?,?,?,?,?,?)',
@@ -358,8 +442,8 @@ def import_pdf(conn, source=SOURCE):
                 row = {
                     'calendar_day_id': day_ids[day], 'source_block_id': block_id,
                     'source_key': f'{digest}:{day}:{variants[day]}:{ordinal}',
-                    'liturgical_year': YEAR, 'celebration_date': day, **record,
-                    'source_reference': f'{source.name}, PDF-Seite {record["source_page"]} (Druckseite {record["source_page"]-2})',
+                    'liturgical_year': year, 'celebration_date': day, **record,
+                    'source_reference': f'{source_name}, PDF-Seite {record["source_page"]}',
                 }
                 columns = ','.join(row)
                 conn.execute(f'INSERT INTO saints({columns}) VALUES({",".join("?" for _ in row)})', tuple(row.values()))

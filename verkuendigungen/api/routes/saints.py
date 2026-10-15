@@ -4,8 +4,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ...repositories.saints import get_saint, list_celebrations, set_disabled
-from ...schemas.saints import Saint, SaintUpdate
+from ...repositories.saints import get_saint, list_celebrations, count_celebrations, update_saint as save_saint
+from ...schemas.saints import Saint, SaintUpdate, SaintPage, Rank, Observance
 from ..dependencies import get_database
 
 router = APIRouter(prefix='/saints', tags=['Heilige und Feiern'])
@@ -31,6 +31,29 @@ def list_saints(
                              available_only=available_only, limit=limit, offset=offset)
 
 
+@router.get('/page', response_model=SaintPage)
+def paged_saints(conn: Connection,
+    start: date = date(1,1,1), end: date = date(9999,12,31),
+    year: str | None = None, search: Annotated[str | None,Query(max_length=200)] = None,
+    disabled: bool | None = None, month: Annotated[int | None,Query(ge=1,le=12)] = None,
+    rank: Rank | None = None, observance_status: Observance | None = None,
+    limit: Annotated[int,Query(ge=1,le=1000)] = 25, offset: Annotated[int,Query(ge=0)] = 0):
+    if start>end:
+        raise HTTPException(422,'Das Ende liegt vor dem Beginn.')
+    filters=dict(available_only=False,year=year,search=search,disabled=disabled,month=month,rank=rank,observance_status=observance_status)
+    return dict(items=list_celebrations(conn,start.isoformat(),end.isoformat(),limit=limit,offset=offset,**filters),
+        total=count_celebrations(conn,start.isoformat(),end.isoformat(),**filters),limit=limit,offset=offset)
+
+
+@router.get('/filters')
+def filter_options(conn: Connection):
+    return {
+        'years':[r[0] for r in conn.execute('SELECT DISTINCT liturgical_year FROM saints ORDER BY liturgical_year DESC')],
+        'total':conn.execute('SELECT count(*) FROM saints').fetchone()[0],
+        'active':conn.execute('SELECT count(*) FROM saints WHERE disabled=0').fetchone()[0],
+    }
+
+
 @router.get('/{saint_id}', response_model=Saint)
 def read_saint(saint_id: int, conn: Connection):
     row = get_saint(conn, saint_id)
@@ -42,7 +65,9 @@ def read_saint(saint_id: int, conn: Connection):
 @router.patch('/{saint_id}', response_model=Saint)
 def update_saint(saint_id: int, payload: SaintUpdate, conn: Connection):
     try:
-        set_disabled(conn, saint_id, payload.disabled)
+        save_saint(conn, saint_id, payload.model_dump(exclude_unset=True))
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from exc
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(409,'Eine Feier mit diesem Namen existiert bereits im selben Quellenabschnitt.') from exc
     return get_saint(conn, saint_id)

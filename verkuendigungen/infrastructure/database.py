@@ -15,6 +15,7 @@ def database(path=DEFAULT_DATABASE):
     # Jede Anfrage erhält ihre eigene Verbindung, keine globale Verbindung.
     conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    conn.create_function('casefold', 1, lambda value: (value or '').casefold(), deterministic=True)
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA busy_timeout = 5000")
     try:
@@ -25,12 +26,16 @@ def database(path=DEFAULT_DATABASE):
 
 def migrate(conn):
     version = conn.execute("PRAGMA user_version").fetchone()[0]
-    if version > 1:
+    if version > 2:
         raise ValueError("Die Datenbank ist neuer als diese Anwendung.")
-    if version == 0:
-        sql = (Path(__file__).parent / "migrations/001_initial.sql").read_text(encoding="utf-8")
+    for migration in sorted((Path(__file__).parent / 'migrations').glob('*.sql')):
+        target = int(migration.name.split('_')[0])
+        if target <= version:
+            continue
+        sql = migration.read_text(encoding='utf-8')
         try:
-            conn.executescript("BEGIN IMMEDIATE;\n" + sql + "\nPRAGMA user_version = 1;\nCOMMIT;")
+            conn.executescript("BEGIN IMMEDIATE;\n" + sql + f"\nPRAGMA user_version = {target};\nCOMMIT;")
         except Exception:
             conn.rollback()
             raise
+        version = target

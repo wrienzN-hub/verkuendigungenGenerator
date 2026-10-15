@@ -6,7 +6,7 @@ from pathlib import Path
 
 from verkuendigungen.infrastructure.database import database, migrate
 from verkuendigungen.repositories.saints import list_celebrations, set_disabled
-from verkuendigungen.services.directorium import import_pdf
+from verkuendigungen.services.directorium import celebration_name, import_pdf
 
 
 class DirectoriumImportTests(unittest.TestCase):
@@ -41,9 +41,10 @@ class DirectoriumImportTests(unittest.TestCase):
 
     def test_multiple_optional_saints_and_wrapped_title(self):
         rows = self.entries('2026-12-04', True)
-        self.assertEqual({r['name'] for r in rows}, {'Hl. Barbara, Märtyrin in Nikomedien (RK)', 'Hl. Johannes von Damaskus, Priester, Kirchenlehrer'})
+        self.assertEqual({r['name'] for r in rows}, {'Hl. Barbara', 'Hl. Johannes von Damaskus'})
         self.assertEqual({r['rank_code'] for r in rows}, {'g'})
-        self.assertEqual(self.entries('2026-12-03')[0]['name'], 'Hl. Franz Xaver, Ordenspriester, Glaubensbote in Indien und Ostasien')
+        self.assertEqual(self.entries('2026-12-03')[0]['name'], 'Hl. Franz Xaver')
+        self.assertIn('Ordenspriester', self.entries('2026-12-03')[0]['source_text'])
 
     def test_christmas_and_lenten_commemorations(self):
         self.assertEqual(next(r for r in self.entries('2026-12-29') if 'Becket' in r['name'])['observance_status'], 'commemoration_only')
@@ -84,12 +85,43 @@ class DirectoriumImportTests(unittest.TestCase):
             self.conn.execute('UPDATE saints SET disabled=2 WHERE id=1')
 
     def test_titles_do_not_include_wrapped_prayer_notes(self):
-        self.assertEqual(self.entries('2027-01-02')[0]['name'], 'Hl. Basilius der Große und hl. Gregor von Nazianz, Bischöfe, Kirchenlehrer')
+        self.assertEqual(self.entries('2027-01-02')[0]['name'], 'Hl. Basilius der Große und hl. Gregor von Nazianz')
         self.assertEqual(self.entries('2027-01-24', True)[0]['name_sl'], '3. NAVADNA NEDELJA')
 
     def test_migrations_can_be_repeated(self):
         migrate(self.conn)
-        self.assertEqual(self.conn.execute('PRAGMA user_version').fetchone()[0], 1)
+        self.assertEqual(self.conn.execute('PRAGMA user_version').fetchone()[0], 2)
+
+    def test_name_cleanup_preserves_multiple_saints_and_identifying_aliases(self):
+        examples = {
+            'Hl. John Fisher, Bischof von Rochester, und hl. Thomas Morus, Lordkanzler, Märtyrer': 'Hl. John Fisher und hl. Thomas Morus',
+            'HLL. CYRILL, Mönch, und METHODIUS, Bischof, Schutzpatrone Europas': 'HLL. CYRILL und METHODIUS',
+            'Hl. Heinrich II., Kaiser und hl Kunigunde, Kaiserin, (RK)': 'Hl. Heinrich II. und hl Kunigunde',
+            'HL. THERESIA BENEDICTA VOM KREUZ (Edith Stein), Jungfrau, Märtyrin': 'HL. THERESIA BENEDICTA VOM KREUZ (Edith Stein)',
+            'Hll. Marta, Maria und Lazarus': 'Hll. Marta, Maria und Lazarus',
+            'Maria, Mutter der Kirche': 'Maria, Mutter der Kirche',
+            'SV. CIRIL, menih, in METOD, škof, zavetnika Evrope': 'SV. CIRIL in METOD',
+        }
+        for original, expected in examples.items():
+            with self.subTest(original=original):
+                self.assertEqual(celebration_name(original), expected)
+                self.assertEqual(celebration_name(expected), expected)
+
+    def test_existing_import_gets_clean_names_without_losing_source_or_status(self):
+        row = self.entries('2026-12-04')[0]
+        with self.conn:
+            self.conn.execute('UPDATE saints SET name=?,disabled=1 WHERE id=?', (row['source_text'], row['id']))
+            self.conn.execute("UPDATE import_runs SET parser_version='gurk-2026-27-v1'")
+        try:
+            report = import_pdf(self.conn)
+            updated = next(r for r in self.entries('2026-12-04') if r['id'] == row['id'])
+            self.assertEqual(report['updated_names'], 1)
+            self.assertEqual(updated['name'], row['name'])
+            self.assertEqual(updated['source_text'], row['source_text'])
+            self.assertEqual(updated['disabled'], 1)
+            self.assertEqual(import_pdf(self.conn)['updated_names'], 0)
+        finally:
+            set_disabled(self.conn, row['id'], False)
 
 
 if __name__ == '__main__':
