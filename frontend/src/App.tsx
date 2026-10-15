@@ -21,9 +21,7 @@ export default function App() {
             <span className="brand-mark">
               <Church size={25} />
             </span>
-            <span>
-              Verkündigungen<small>PFARRE EBERNDORF</small>
-            </span>
+            <span>Verkündigungen</span>
           </a>
           <nav aria-label="Hauptnavigation">
             <a
@@ -43,10 +41,6 @@ export default function App() {
               Heilige
             </a>
           </nav>
-          <span className="diocese">
-            <span className="online-dot" />
-            Diözese Gurk
-          </span>
         </div>
       </header>
       <main id="main" tabIndex={-1} className="page-shell">

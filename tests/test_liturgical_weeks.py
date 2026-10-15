@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from verkuendigungen.api.app import create_app
 from verkuendigungen.infrastructure.database import database
 from verkuendigungen.services.directorium import import_pdf
-from verkuendigungen.services.liturgical_weeks import list_weeks
+from verkuendigungen.services.liturgical_weeks import list_weeks, year_bounds
 
 
 class LiturgicalWeekTests(unittest.TestCase):
@@ -42,13 +42,13 @@ class LiturgicalWeekTests(unittest.TestCase):
         self.assertTrue(any(w['season']=='christmas' for w in weeks))
         self.assertEqual(len({w['id'] for w in weeks}),len(weeks))
 
-    def test_filter_includes_both_sundays_and_correct_total(self):
+    def test_week_filter_respects_december_year_boundary_and_correct_total(self):
         params={'year':'2026/27','liturgical_week':'advent:2026-11-29'}
         response=self.client.get('/api/v1/saints/page',params=params)
         self.assertEqual(response.status_code,200)
         data=response.json()
-        self.assertEqual(data['total'],9)  # einschließlich des entfallenen Nikolaus.
-        self.assertEqual(data['items'][0]['celebration_date'],'2026-11-29')
+        self.assertEqual(data['total'],7)  # November liegt außerhalb des gewählten Dezember-Jahres.
+        self.assertEqual(data['items'][0]['celebration_date'],'2026-12-02')
         self.assertEqual(data['items'][-1]['celebration_date'],'2026-12-06')
         page=self.client.get('/api/v1/saints/page',params={**params,'limit':2,'offset':2}).json()
         self.assertEqual(page['total'],data['total'])
@@ -62,3 +62,20 @@ class LiturgicalWeekTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/v1/saints/page?year=2026/27&liturgical_week=advent:2026-11-30').status_code,422)
         result=self.client.get('/api/v1/saints/page',params={'year':'2026/27','liturgical_week':'advent:2026-11-29','start':'2027-01-01'}).json()
         self.assertEqual(result['total'],0)
+
+    def test_december_to_november_year_includes_next_directorium_boundary(self):
+        from pdf_factory import directorium_pdf
+        import sqlite3
+        with tempfile.TemporaryDirectory() as folder:
+            target=Path(folder)/'boundary.sqlite3'
+            with database(self.path) as source:
+                dest=sqlite3.connect(target);source.backup(dest);dest.close()
+            with database(target) as conn:
+                import_pdf(conn,pdf_bytes=directorium_pdf(2027),filename='next.pdf')
+            with TestClient(create_app(target)) as client:
+                result=client.get('/api/v1/saints/page',params={'year':'2026/27','start':'2027-11-28','limit':100}).json()
+                self.assertEqual([r['celebration_date'] for r in result['items']],['2027-11-28','2027-11-29','2027-11-30'])
+                self.assertTrue(all(r['liturgical_year']=='2027/28' for r in result['items']))
+        self.assertEqual(tuple(d.isoformat() for d in year_bounds('2026/27')),('2026-12-01','2027-11-30'))
+        with self.assertRaises(ValueError):year_bounds('2026/28')
+        self.assertEqual(self.client.get('/api/v1/saints/weeks?year=2026/28').status_code,422)

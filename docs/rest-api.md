@@ -101,4 +101,6 @@ Fehlende Kalendertage verhindern den Import nicht, sofern mindestens 90 % des Ki
 
 `GET /api/v1/saints/weeks?year=2026%2F27` liefert die im Directorium erkennbaren Wochen mit `id`, `season`, `season_label`, `week`, `label`, `start` und `end`. Für benannte Zeiträume ohne Wochennummer ist `week` null. Fehlende Kirchenjahre liefern eine leere Liste.
 
-`GET /api/v1/saints/page?year=2026%2F27&liturgical_week=advent%3A2026-11-29` filtert die erste Adventswoche vom 29. November bis einschließlich 6. Dezember. Die Woche muss zum angegebenen Kirchenjahr gehören; ungültige Kombinationen liefern HTTP 422. Ein zusätzlicher Datumsbereich wird mit dem Wochenzeitraum geschnitten. Andere Filter und Paging bleiben kombinierbar.
+`GET /api/v1/saints/page?year=2026%2F27&liturgical_week=advent%3A2026-11-29` wählt die erste Adventswoche (29. November bis 6. Dezember) und schneidet sie mit dem Jahresfilter; das Ergebnis beginnt daher frühestens am 1. Dezember. Die Woche muss zum angegebenen Kirchenjahr gehören; ungültige Kombinationen liefern HTTP 422. Ein zusätzlicher Datumsbereich wird mit dem Wochenzeitraum geschnitten. Andere Filter und Paging bleiben kombinierbar.
+
+Für `/saints/page` und `/saints/weeks` bezeichnet `year=2026/27` den Zeitraum 01.12.2026–30.11.2027. Die Auswahl basiert auf Datumsgrenzen über alle importierten Directorien hinweg; die Quellenzuordnung `liturgical_year` der Datensätze bleibt erhalten. Der ältere Listenendpunkt `/saints` behält seinen Filter auf das Quellenkirchenjahr bei.

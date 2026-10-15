@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from ...repositories.saints import get_saint, list_celebrations, count_celebrations, update_saint as save_saint
 from ...schemas.saints import Saint, SaintUpdate, SaintPage, Rank, Observance
 from ..dependencies import get_database
-from ...services.liturgical_weeks import list_weeks
+from ...services.liturgical_weeks import list_weeks, year_bounds
 
 router = APIRouter(prefix='/saints', tags=['Heilige und Feiern'])
 Connection = Annotated[sqlite3.Connection, Depends(get_database)]
@@ -42,6 +42,13 @@ def paged_saints(conn: Connection,
     limit: Annotated[int,Query(ge=1,le=1000)] = 25, offset: Annotated[int,Query(ge=0)] = 0):
     if start>end:
         raise HTTPException(422,'Das Ende liegt vor dem Beginn.')
+    if year:
+        try:
+            year_start,year_end=year_bounds(year)
+        except ValueError as exc:
+            raise HTTPException(422,str(exc)) from exc
+        start=max(start,year_start)
+        end=min(end,year_end)
     if liturgical_week:
         if not year:
             raise HTTPException(422,'Für eine liturgische Woche ist ein Kirchenjahr erforderlich.')
@@ -52,14 +59,19 @@ def paged_saints(conn: Connection,
         end=min(end,date.fromisoformat(selected['end']))
         if start>end:
             return dict(items=[],total=0,limit=limit,offset=offset)
-    filters=dict(available_only=False,year=year,search=search,disabled=disabled,month=month,rank=rank,observance_status=observance_status)
+    if start>end:
+        return dict(items=[],total=0,limit=limit,offset=offset)
+    filters=dict(available_only=False,search=search,disabled=disabled,month=month,rank=rank,observance_status=observance_status)
     return dict(items=list_celebrations(conn,start.isoformat(),end.isoformat(),limit=limit,offset=offset,**filters),
         total=count_celebrations(conn,start.isoformat(),end.isoformat(),**filters),limit=limit,offset=offset)
 
 
 @router.get('/weeks')
 def week_options(conn: Connection, year: Annotated[str,Query(max_length=20)]):
-    return list_weeks(conn,year)
+    try:
+        return list_weeks(conn,year)
+    except ValueError as exc:
+        raise HTTPException(422,str(exc)) from exc
 
 
 @router.get('/filters')

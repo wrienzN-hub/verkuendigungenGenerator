@@ -325,7 +325,7 @@ p {
 .filters {
   padding: 0 25px 23px;
   display: grid;
-  grid-template-columns: 1.8fr 1fr 1fr 1.35fr 1fr;
+  grid-template-columns: 1.25fr 0.85fr 0.8fr 2fr 1.1fr 0.85fr;
   gap: 12px;
   align-items: end;
 }
@@ -1446,4 +1446,8 @@ tbody tr:hover {
   .week-range {
     width: 100%;
   }
+}
+
+.filters > label {
+  min-width: 0;
 }

@@ -19,11 +19,23 @@ PATTERNS = [
 ]
 
 
+def year_bounds(year):
+    match = re.fullmatch(r'(20\d{2})/(\d{2}|20\d{2}|2100)',year)
+    if not match:
+        raise ValueError('Das Jahr muss im Format 2026/27 angegeben werden.')
+    first = int(match[1])
+    second = int(match[2])
+    if second != (first+1 if len(match[2])==4 else (first+1)%100):
+        raise ValueError('Das Jahr muss zwei aufeinanderfolgende Jahre enthalten.')
+    return date(first,12,1),date(first+1,11,30)
+
+
 def list_weeks(conn, year):
+    start,end=year_bounds(year)
     rows = conn.execute(
         'SELECT d.calendar_date,b.header_text FROM calendar_days d '
         'JOIN source_day_blocks b ON b.calendar_day_id=d.id '
-        'WHERE d.liturgical_year=? ORDER BY d.calendar_date,b.variant', (year,),
+        'WHERE d.calendar_date BETWEEN ? AND ? ORDER BY d.calendar_date,b.variant', (start.isoformat(),end.isoformat()),
     )
     weeks = {}
     for row in rows:
