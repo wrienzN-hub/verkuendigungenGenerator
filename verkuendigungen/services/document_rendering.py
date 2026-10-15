@@ -72,16 +72,20 @@ def paragraph(prototype, value, *, bold=None):
             for item in properties.findall('w:' + tag, NS):
                 properties.remove(item)
     if bold is not None:
-        for item in run_props.findall('w:b', NS):
-            run_props.remove(item)
-        ET.SubElement(run_props, W + 'b', {W + 'val': '1' if bold else '0'})
+        for tag in ['b', 'bCs']:
+            for item in run_props.findall('w:' + tag, NS):
+                run_props.remove(item)
+            ET.SubElement(run_props, W + tag, {W + 'val': '1' if bold else '0'})
     run = ET.SubElement(result, W + 'r')
     run.append(run_props)
     for index, line in enumerate(value.split('\n')):
         if index:
             ET.SubElement(run, W + 'br')
-        node = ET.SubElement(run, W + 't', {'{http://www.w3.org/XML/1998/namespace}space': 'preserve'})
-        node.text = line
+        for column, part in enumerate(line.split('\t')):
+            if column:
+                ET.SubElement(run, W + 'tab')
+            node = ET.SubElement(run, W + 't', {'{http://www.w3.org/XML/1998/namespace}space': 'preserve'})
+            node.text = part
     return result
 
 
@@ -158,15 +162,87 @@ def contact_lines(payload):
     return lines
 
 
+def office_lines(hours):
+    groups = {}
+    for item in hours:
+        groups.setdefault((item.from_, item.until), []).append(OFFICE_DAYS[item.weekday])
+    return [' & '.join(days) + f': {start}–{end}' for (start, end), days in groups.items()]
+
+
+def contact_paragraph(prototype, value, body):
+    result = paragraph(prototype, value, bold=False)
+    if '\t' in value:
+        section = body.find('w:sectPr', NS)
+        size = section.find('w:pgSz', NS) if section is not None else None
+        margins = section.find('w:pgMar', NS) if section is not None else None
+        width = int(size.get(W + 'w', '11906')) if size is not None else 11906
+        width -= int(margins.get(W + 'left', '540')) + int(margins.get(W + 'right', '851')) if margins is not None else 1391
+        properties = result.find('w:pPr', NS)
+        if properties is None:
+            properties = ET.Element(W + 'pPr'); result.insert(0, properties)
+        for tabs in properties.findall('w:tabs', NS):
+            properties.remove(tabs)
+        ET.SubElement(ET.SubElement(properties, W + 'tabs'), W + 'tab', {W + 'val': 'right', W + 'pos': str(width)})
+    return result
+
+
 def additional_lines(payload):
     lines = announcement_lines(payload)
     if payload.eternal_light.enabled and bilingual(payload.eternal_light.dedication):
         lines.append(('Das ewige Licht brennt für | Večna luč gori za: ' + bilingual(payload.eternal_light.dedication), False))
     if payload.office_hours:
         lines.append(('Kanzleistunden | Uradne ure', True))
-        lines.extend((f'{OFFICE_DAYS[item.weekday]}: {item.from_}–{item.until}', False) for item in payload.office_hours)
+        lines.extend((value, False) for value in office_lines(payload.office_hours))
     lines.extend(contact_lines(payload))
     return lines
+
+
+def normalize_overlaid_banner(body, table):
+    """Repair the legacy Gurk pair of overlaid full-width banners only.
+
+    A full-width image inside a floating text box is followed by another
+    full-width picture in the same paragraph. This is already broken in the
+    source. Keep the first branding image as an inline banner, removing the
+    overlay and the stray positioning text. Other templates are untouched.
+    """
+    v = {'v': 'urn:schemas-microsoft-com:vml', **NS}
+    prefix = list(body)[:list(body).index(table)]
+    for node in prefix:
+        nested = node.xpath('.//w:txbxContent//w:pict[v:shape/v:imagedata]', namespaces=v)
+        peers = node.xpath('./w:r/w:pict[v:shape/v:imagedata]', namespaces=v) or nested[1:]
+        if not nested or not peers:
+            continue
+        shape = nested[0].find('v:shape', v)
+        peer_shape = peers[0].find('v:shape', v)
+        def size(item):
+            values = dict(part.strip().split(':', 1) for part in item.get('style', '').split(';') if ':' in part)
+            try:
+                return float(values['width'].removesuffix('pt')), float(values['height'].removesuffix('pt'))
+            except (ValueError, KeyError):
+                return 0, 0
+        width, height = size(shape)
+        if width < 500 or size(peer_shape)[0] < 500:
+            continue
+        heading = next((p for p in prefix if p.tag == W + 'p' and 'Heilige Messen' in plain(p)), None)
+        if heading is None:
+            continue
+        picture = deepcopy(nested[0])
+        cloned_shape = picture.find('v:shape', v)
+        table_width = table.find('w:tblPr/w:tblW', NS)
+        target_width = float(table_width.get(W + 'w', '11100')) / 20 if table_width is not None else 555
+        cloned_shape.set('style', f'width:{target_width:g}pt;height:{height * target_width / width:g}pt')
+        banner = ET.Element(W + 'p')
+        props = ET.SubElement(banner, W + 'pPr')
+        ET.SubElement(props, W + 'spacing', {W + 'after': '160'})
+        ET.SubElement(props, W + 'ind', {W + 'left': '-115'})
+        ET.SubElement(banner, W + 'r').append(picture)
+        for old in prefix:
+            body.remove(old)
+        body.insert(0, banner)
+        body.insert(1, heading)
+        body.insert(2, ET.Element(W + 'p'))
+        return True
+    return False
 
 
 def render_docx(source: bytes, payload: DocumentPayload):
@@ -176,6 +252,7 @@ def render_docx(source: bytes, payload: DocumentPayload):
         table = table_slot(root)
         extra = additional_lines(payload)
         if table is not None:
+            normalize_overlaid_banner(body, table)
             day_rows(table, payload)
             # The Gurk template's variable area starts after the schedule. Keep
             # its logo, title, table grid, sections, styles and package parts.
@@ -183,7 +260,8 @@ def render_docx(source: bytes, payload: DocumentPayload):
             tail = siblings[siblings.index(table) + 1:]
             heading = next((node for node in tail if node.tag == W + 'p' and 'Termine' in plain(node)), None)
             prototype = next((node for node in tail if node.tag == W + 'p' and plain(node) and node is not heading), ET.Element(W + 'p'))
-            footer = next((node for node in tail if node.tag == W + 'tbl' and 'ewige Licht' in plain(node) and 'Kanzlei' in plain(node)), None)
+            footer = next((node for node in tail if node.tag == W + 'tbl' and ('ewige Licht' in plain(node) or 'Kanzlei' in plain(node))), None)
+            contact_prototypes = [node for node in tail if node.tag == W + 'p' and plain(node) and node is not heading]
             section = body.find('w:sectPr', NS)
             for node in tail:
                 if node is not section:
@@ -206,10 +284,12 @@ def render_docx(source: bytes, payload: DocumentPayload):
                 footer_rows = footer.findall('w:tr', NS)
                 for index, row in enumerate(footer_rows):
                     values = []
-                    if index == 0 and payload.eternal_light.enabled and bilingual(payload.eternal_light.dedication):
+                    label = plain(row).casefold()
+                    if 'ewige licht' in label and payload.eternal_light.enabled and bilingual(payload.eternal_light.dedication):
                         values = [('Das ewige Licht brennt für | Večna luč gori za: ' + bilingual(payload.eternal_light.dedication), True)]
-                    elif index == 1 and payload.office_hours:
-                        values = [('Kanzleistunden | Uradne ure', True)] + [(f'{OFFICE_DAYS[h.weekday]}: {h.from_}–{h.until}', False) for h in payload.office_hours]
+                    elif 'kanzlei' in label and payload.office_hours:
+                        hours = '; '.join(office_lines(payload.office_hours))
+                        values = [('Kanzleistunden | Uradne ure: ' + hours, True)]
                     if not values:
                         footer.remove(row)
                         continue
@@ -224,8 +304,13 @@ def render_docx(source: bytes, payload: DocumentPayload):
                     append(footer)
                 if contact_lines(payload):
                     append(paragraph(prototype, ''))
-                    for value, bold in contact_lines(payload):
-                        append(paragraph(prototype, value, bold=bold))
+                    persons = [' · '.join(part for part in [p.name, p.phone] if part) for p in payload.contact.persons if p.name or p.phone]
+                    for index in range(0, len(persons), 2):
+                        append(contact_paragraph(prototype, '\t'.join(persons[index:index+2]), body))
+                    links = [value for value in [('E-Mail: ' + payload.contact.email) if payload.contact.email else '', payload.contact.website] if value]
+                    if links:
+                        link_prototype = contact_prototypes[1] if len(contact_prototypes) > 1 else prototype
+                        append(contact_paragraph(link_prototype, '\t'.join(links), body))
         else:
             marker = next((p for p in body.findall('w:p', NS) if plain(p).strip() == '{{inhalt}}'), None)
             if marker is None:

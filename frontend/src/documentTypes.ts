@@ -43,6 +43,7 @@ export type SavedDocument = {
   revision: number;
   payload: Payload;
   has_pdf: boolean;
+  has_docx: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -52,7 +53,7 @@ export type DocumentSummary = {
   parish_name: string;
   start: string;
   end: string;
-  has_pdf: boolean;
+  has_docx: boolean;
   updated_at: string;
 };
 export type DocumentOptions = {
@@ -64,5 +65,5 @@ export type DocumentOptions = {
     source_filename: string;
     supported: boolean;
   }[];
-  pdf_available: boolean;
+  preview_available: boolean;
 };

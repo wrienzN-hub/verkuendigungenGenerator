@@ -145,3 +145,20 @@ class PrepareDocument(Model):
 class SaveDocument(Model):
     payload: DocumentPayload
     revision: int | None = Field(default=None, ge=1)
+
+
+class RecurringService(Service):
+    weekday: int = Field(ge=0, le=6)
+
+
+class ParishDefaults(Model):
+    services: list[RecurringService] = Field(default_factory=list, max_length=100)
+    office_hours: list[OfficeHours] = Field(default_factory=list, max_length=30)
+    contact: Contact = Field(default_factory=Contact)
+
+    @model_validator(mode='after')
+    def unique_services(self):
+        ids = [service.id for service in self.services]
+        if len(ids) != len(set(ids)):
+            raise ValueError('Die Gottesdienste benötigen eindeutige IDs.')
+        return self

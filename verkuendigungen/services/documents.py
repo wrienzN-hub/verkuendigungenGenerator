@@ -1,5 +1,6 @@
 import hashlib
 import json
+from uuid import uuid4
 from datetime import date, timedelta
 
 from ..core.config import ROOT
@@ -45,6 +46,9 @@ def generation_weeks(conn, year):
 
 def prepare(conn, template_id, year, week_id):
     template = template_source(conn, template_id)
+    settings_row = conn.execute('SELECT settings_json FROM parish_defaults WHERE parish_name=?', (template['parish_name'],)).fetchone()
+    from ..schemas.documents import ParishDefaults
+    settings = ParishDefaults.model_validate_json(settings_row[0]) if settings_row else ParishDefaults()
     if not template_supported(template['docx']):
         raise ValueError('Diese Word-Vorlage benötigt einen eigenen Absatz mit {{inhalt}} oder die unterstützte Wochentabelle.')
     week = next((item for item in generation_weeks(conn, year) if item['id'] == week_id), None)
@@ -64,12 +68,22 @@ def prepare(conn, template_id, year, week_id):
         for item in entries:
             unique.setdefault((item['name'], item['name_sl']), item)
         days.append({'id': 'day-' + day, 'date': day, 'enabled': True,
-            'celebrations': [{'id': 'celebration-' + str(item['id']), 'source_celebration_id': item['id'], 'title': {'de': item['name'], 'sl': item['name_sl'] or ''}, 'rank': item['rank_code'], 'enabled': item['observance_status'] == 'observed'} for item in unique.values()],
+            'celebrations': [{'id': 'celebration-' + str(item['id']), 'source_celebration_id': item['id'], 'title': {'de': item['name'], 'sl': item['name_sl'] or ''}, 'rank': item['rank_code'], 'enabled': True} for item in unique.values()],
             'services': [], 'notices': []})
+    for day in days:
+        for rule in settings.services:
+            if rule.enabled and date.fromisoformat(day['date']).weekday() == rule.weekday:
+                service = rule.model_dump(mode='json', exclude={'weekday'})
+                service['id'] = str(uuid4())
+                for item in [*service['intentions'], *service['notices']]:
+                    item['id'] = str(uuid4())
+                day['services'].append(service)
     payload = DocumentPayload.model_validate({'schema_version': 1, 'template_id': template_id, 'template_version': hashlib.sha256(template['docx']).hexdigest(),
         'parish': {'id': template['parish_name'], 'name': {'de': template['parish_name'], 'sl': ''}},
         'selection': {'liturgical_year': year, 'season': week['season'], 'week': week['week'], 'week_id': week_id},
-        'period': {'start': start, 'end': end}, 'days': days})
+        'period': {'start': start, 'end': end}, 'days': days,
+        'office_hours': settings.model_dump(mode='json', by_alias=True)['office_hours'],
+        'contact': settings.contact.model_dump(mode='json')})
     warnings = ['Für folgende Tage fehlen Kalenderdaten: ' + ', '.join(missing) + '. Bitte die Einträge ergänzen.'] if missing else []
     return {'payload': payload.model_dump(mode='json', by_alias=True), 'warnings': warnings}
 
@@ -81,10 +95,11 @@ def validate_selection(conn, payload):
 
 
 def read_document(conn, document_id):
-    row = conn.execute('SELECT id,payload_json,revision,created_at,updated_at,generated_pdf IS NOT NULL AS has_pdf FROM document_payloads WHERE id=?', (document_id,)).fetchone()
+    row = conn.execute('SELECT id,payload_json,revision,created_at,updated_at,generated_pdf IS NOT NULL AS has_pdf,generated_docx IS NOT NULL AS has_docx FROM document_payloads WHERE id=?', (document_id,)).fetchone()
     if row is None:
-        raise LookupError('Abkündigung nicht gefunden.')
+        raise LookupError('Verkündigung nicht gefunden.')
     result = dict(row)
     result['payload'] = json.loads(result.pop('payload_json'))
     result['has_pdf'] = bool(result['has_pdf'])
+    result['has_docx'] = bool(result['has_docx'])
     return result

@@ -10,13 +10,13 @@ from ...schemas.documents import DocumentPayload, PrepareDocument, SaveDocument
 from ...services.documents import generation_weeks, options, prepare, read_document, template_source, validate_selection
 from ...services.document_rendering import ConversionError, additional_lines, bilingual, converter_available, convert_pdf, render_docx
 
-router = APIRouter(prefix='/documents', tags=['Abkündigungen'])
+router = APIRouter(prefix='/documents', tags=['Verkündigungen'])
 Connection = Annotated[sqlite3.Connection, Depends(get_database)]
 
 
 @router.get('/options')
 def document_options(conn: Connection):
-    return {**options(conn), 'pdf_available': converter_available()}
+    return {**options(conn), 'preview_available': converter_available()}
 
 
 @router.get('/weeks')
@@ -36,8 +36,8 @@ def prepare_document(payload: PrepareDocument, conn: Connection):
 
 @router.get('')
 def list_documents(conn: Connection, limit: Annotated[int, Query(ge=1, le=100)] = 20, offset: Annotated[int, Query(ge=0)] = 0):
-    rows = conn.execute("SELECT id,revision,created_at,updated_at,generated_pdf IS NOT NULL AS has_pdf, json_extract(payload_json,'$.parish.name.de') AS parish_name, json_extract(payload_json,'$.period.start') AS start, json_extract(payload_json,'$.period.end') AS end FROM document_payloads ORDER BY updated_at DESC,id DESC LIMIT ? OFFSET ?", (limit, offset))
-    return {'items': [{**dict(row), 'has_pdf': bool(row['has_pdf'])} for row in rows], 'total': conn.execute('SELECT count(*) FROM document_payloads').fetchone()[0]}
+    rows = conn.execute("SELECT id,revision,created_at,updated_at,generated_docx IS NOT NULL AS has_docx, json_extract(payload_json,'$.parish.name.de') AS parish_name, json_extract(payload_json,'$.period.start') AS start, json_extract(payload_json,'$.period.end') AS end FROM document_payloads ORDER BY updated_at DESC,id DESC LIMIT ? OFFSET ?", (limit, offset))
+    return {'items': [{**dict(row), 'has_docx': bool(row['has_docx'])} for row in rows], 'total': conn.execute('SELECT count(*) FROM document_payloads').fetchone()[0]}
 
 
 @router.post('', status_code=201)
@@ -81,8 +81,7 @@ def update_document(document_id: int, body: SaveDocument, conn: Connection):
     return read_document(conn, document_id)
 
 
-@router.post('/{document_id}/generate')
-def generate_document(document_id: int, conn: Connection, revision: Annotated[int, Query(ge=1)]):
+def generate(document_id, conn, revision, preview=False):
     current = get_document(document_id, conn)
     if current['revision'] != revision:
         raise HTTPException(409, 'Der Entwurf wurde inzwischen geändert. Bitte erneut öffnen.')
@@ -93,23 +92,56 @@ def generate_document(document_id: int, conn: Connection, revision: Annotated[in
     template = conn.execute('SELECT template_docx FROM document_payloads WHERE id=?', (document_id,)).fetchone()[0]
     try:
         docx = render_docx(template, payload)
-        pdf = convert_pdf(docx)
+        pdf = convert_pdf(docx) if preview else None
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except ConversionError as exc:
         raise HTTPException(503, str(exc)) from exc
     with conn:
-        cursor = conn.execute('UPDATE document_payloads SET generated_docx=?,generated_pdf=? WHERE id=? AND revision=?', (docx, pdf, document_id, revision))
+        cursor = conn.execute('UPDATE document_payloads SET generated_docx=?,generated_pdf=coalesce(?,generated_pdf) WHERE id=? AND revision=?', (docx, pdf, document_id, revision))
         if cursor.rowcount != 1:
-            raise HTTPException(409, 'Während der PDF-Erstellung wurde der Entwurf geändert. Bitte erneut erstellen.')
-    return {'id': document_id, 'revision': revision, 'pdf_url': f'/api/v1/documents/{document_id}/pdf'}
+            raise HTTPException(409, 'Während der Dokumenterstellung wurde der Entwurf geändert. Bitte erneut erstellen.')
+    return {'id': document_id, 'revision': revision, 'docx_url': f'/api/v1/documents/{document_id}/docx', 'preview_url': f'/api/v1/documents/{document_id}/preview?revision={revision}' if preview else None}
 
 
-@router.get('/{document_id}/pdf')
-def download_pdf(document_id: int, conn: Connection):
+@router.post('/{document_id}/generate')
+def generate_document(document_id: int, conn: Connection, revision: Annotated[int, Query(ge=1)]):
+    return generate(document_id, conn, revision)
+
+
+@router.post('/{document_id}/preview')
+def generate_preview(document_id: int, conn: Connection, revision: Annotated[int, Query(ge=1)]):
+    return generate(document_id, conn, revision, preview=True)
+
+
+@router.get('/{document_id}/preview')
+def document_preview(document_id: int, conn: Connection, revision: Annotated[int, Query(ge=1)]):
     current = get_document(document_id, conn)
+    if current['revision'] != revision:
+        raise HTTPException(409, 'Die Vorschau ist veraltet. Bitte erneut laden.')
     row = conn.execute('SELECT generated_pdf FROM document_payloads WHERE id=?', (document_id,)).fetchone()
     if row[0] is None:
-        raise HTTPException(404, 'Für diesen Stand wurde noch kein PDF erstellt.')
-    filename = 'Abkuendigung_' + current['payload']['period']['start'] + '.pdf'
-    return Response(row[0], media_type='application/pdf', headers={'Content-Disposition': "attachment; filename*=UTF-8''" + quote(filename, safe=''), 'Cache-Control': 'no-store'})
+        raise HTTPException(404, 'Für diesen Stand wurde noch keine Dokumentvorschau erstellt.')
+    return Response(row[0], media_type='application/pdf', headers={'Content-Disposition': 'inline', 'Cache-Control': 'no-store'})
+
+
+@router.get('/{document_id}/docx')
+def download_word(document_id: int, conn: Connection):
+    current = get_document(document_id, conn)
+    row = conn.execute('SELECT generated_docx FROM document_payloads WHERE id=?', (document_id,)).fetchone()
+    if row[0] is None:
+        raise HTTPException(404, 'Für diesen Stand wurde noch kein Word-Dokument erstellt.')
+    filename = 'Verkuendigung_' + current['payload']['period']['start'] + '.docx'
+    return Response(row[0], media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document', headers={'Content-Disposition': "attachment; filename*=UTF-8''" + quote(filename, safe=''), 'Cache-Control': 'no-store'})
+
+
+@router.delete('/{document_id}')
+def delete_document(document_id: int, conn: Connection, revision: Annotated[int, Query(ge=1)]):
+    current = get_document(document_id, conn)
+    if current['revision'] != revision:
+        raise HTTPException(409, 'Die Verkündigung wurde inzwischen geändert. Bitte die Liste neu laden.')
+    with conn:
+        cursor = conn.execute('DELETE FROM document_payloads WHERE id=? AND revision=?', (document_id, revision))
+        if cursor.rowcount != 1:
+            raise HTTPException(409, 'Die Verkündigung wurde inzwischen geändert. Bitte die Liste neu laden.')
+    return {'deleted': True, 'id': document_id}

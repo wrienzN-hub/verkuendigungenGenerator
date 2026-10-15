@@ -1,6 +1,6 @@
 # Verkündigungen Generator
 
-Die Anwendung verwaltet Heilige und liturgische Feiern der Diözese Gurk. Ziel ist die Erstellung zweisprachiger Verkündigungen als PDF auf Grundlage einer austauschbaren Word-Vorlage.
+Die Anwendung verwaltet Heilige und liturgische Feiern der Diözese Gurk. Ziel ist die Erstellung zweisprachiger Verkündigungen als Word-Datei auf Grundlage einer austauschbaren Word-Vorlage.
 
 ## Vorhandene Funktionen
 
@@ -58,11 +58,15 @@ Die Anwendung ist ein modularer Monolith: HTTP-Routen und Pydantic-Schemas, Impo
 - [Dokumentablauf und JSON-Vertrag](docs/dokumentablauf.md)
 - [JSON-Template](resources/templates/document-payload.template.json)
 
-## Abkündigung erstellen
+## Pfarrvorgaben
 
-Unter **Erstellen** Pfarre, Word-Vorlage, Kirchenjahr und liturgische Woche wählen und **Woche laden** klicken. Die Anwendung lädt acht Tage von Sonntag bis zum folgenden Sonntag. Gottesdienste, Orte, Uhrzeiten, Messintentionen und Hinweise lassen sich je Tag zweisprachig bearbeiten. Unter **Termine & Kontakt** stehen Ankündigungen, Ewiges Licht, Kanzleistunden und Kontakte bereit. **Abkündigung erstellen** speichert den Entwurf, befüllt die Word-Vorlage und erzeugt das PDF zum Download. Gespeicherte Entwürfe können später erneut geöffnet werden.
+Unter **Einstellungen** pro Pfarre die regelmäßigen Gottesdienste mit Wochentag, Uhrzeit, Ort und zweisprachigem Titel hinterlegen. Auch mehrere Gottesdienste am selben Wochentag, Kanzleistunden und Kontaktdaten sind möglich. Neue Wochen übernehmen alle aktiven Vorgaben; bestehende Entwürfe bleiben unverändert.
 
-Die PDF-Konvertierung benötigt **Microsoft Word unter Windows** (für den Benutzer eingerichtet) oder **LibreOffice**. Es ist kein Docker-Container nötig. LibreOffice wird auf dem PATH oder im Standardinstallationsordner gefunden; alternativ `VERKUENDIGUNGEN_SOFFICE` auf die ausführbare Datei setzen. Ein fehlender Konverter verhindert das Speichern von Entwürfen nicht.
+## Verkündigung erstellen
+
+Unter **Erstellen** Pfarre, Word-Vorlage, Kirchenjahr und liturgische Woche wählen und **Woche laden** klicken. Die Anwendung lädt acht Tage von Sonntag bis zum folgenden Sonntag. Gottesdienste, Orte, Uhrzeiten, Messintentionen und Hinweise lassen sich je Tag zweisprachig bearbeiten. Unter **Termine & Kontakt** stehen Ankündigungen, Ewiges Licht, Kanzleistunden und Kontakte bereit. **Verkündigung erstellen** speichert den Entwurf, befüllt die Word-Vorlage und erzeugt die bearbeitbare DOCX-Datei zum Download. Die Dokumentvorschau zeigt das tatsächliche Layout einschließlich Seitenumbrüchen. Gespeicherte Entwürfe können später erneut geöffnet werden.
+
+Die layoutgetreue Dokumentvorschau benötigt **Microsoft Word unter Windows** (für den Benutzer eingerichtet) oder **LibreOffice**. Es ist kein Docker-Container nötig. LibreOffice wird auf dem PATH oder im Standardinstallationsordner gefunden; alternativ `VERKUENDIGUNGEN_SOFFICE` auf die ausführbare Datei setzen. Die Word-Ausgabe und das Speichern von Entwürfen funktionieren auch ohne Konverter.
 
 Die Eberndorfer Vorlage aus `resources/vorlage.docx` ist direkt auswählbar. Hochgeladene Vorlagen werden unterstützt, wenn sie die vorhandene Wochentabelle verwenden oder einen eigenen Absatz mit `{{inhalt}}` enthalten. Siehe [Dokumentablauf](docs/dokumentablauf.md).
 

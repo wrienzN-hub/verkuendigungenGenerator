@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from ..core.config import ROOT, database_path
 from ..infrastructure.database import database, migrate
-from .routes import imports, saints, templates, documents
+from .routes import imports, saints, templates, documents, settings
 
 
 def create_app(db_path: Path | str | None = None):
@@ -27,6 +27,7 @@ def create_app(db_path: Path | str | None = None):
     app.include_router(imports.router, prefix='/api/v1')
     app.include_router(templates.router, prefix='/api/v1')
     app.include_router(documents.router, prefix='/api/v1')
+    app.include_router(settings.router, prefix='/api/v1')
 
     @app.get('/health', tags=['Betrieb'])
     def health():

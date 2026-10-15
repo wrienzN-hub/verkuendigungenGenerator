@@ -2,24 +2,26 @@ import { useEffect, useState } from 'react';
 import { Download, FilePlus2, Save } from 'lucide-react';
 import { request } from './api';
 import type { LiturgicalWeek } from './types';
-import type { DocumentOptions, DocumentSummary, Payload, SavedDocument } from './documentTypes';
+import type { DocumentOptions, Payload, SavedDocument } from './documentTypes';
 import { formatDate } from './DocumentFields';
 import DocumentDayEditor from './DocumentDayEditor';
 import DocumentExtras from './DocumentExtras';
 import DocumentPreview from './DocumentPreview';
 
-type Draft = { payload: Payload; id?: number; revision?: number; hasPdf: boolean; dirty: boolean };
+type Draft = { payload: Payload; id?: number; revision?: number; hasDocx: boolean; dirty: boolean };
 const STORAGE = 'verkuendigungen-document-draft-v1';
 function recover(): Draft | null {
   try {
     const value = JSON.parse(localStorage.getItem(STORAGE) || 'null');
-    return value?.payload?.schema_version === 1 && Array.isArray(value.payload.days) ? value : null;
+    return value?.payload?.schema_version === 1 && Array.isArray(value.payload.days)
+      ? { ...value, hasDocx: !!value.hasDocx }
+      : null;
   } catch {
     return null;
   }
 }
 
-export default function DocumentsPage() {
+export default function DocumentsPage({ documentId }: { documentId?: number }) {
   const [options, setOptions] = useState<DocumentOptions | null>(null);
   const [parish, setParish] = useState('');
   const [template, setTemplate] = useState('');
@@ -28,26 +30,13 @@ export default function DocumentsPage() {
   const [weekId, setWeekId] = useState('');
   const [weeksLoading, setWeeksLoading] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(recover);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [tab, setTab] = useState('days');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
-  const [history, setHistory] = useState<DocumentSummary[]>([]);
-  const [historyTotal, setHistoryTotal] = useState(0);
-  const [historyOffset, setHistoryOffset] = useState(0);
-  const [historyError, setHistoryError] = useState('');
   const [storageError, setStorageError] = useState(false);
-  const refreshHistory = (offset = historyOffset) =>
-    request<{ items: DocumentSummary[]; total: number }>(
-      `/api/v1/documents?limit=10&offset=${offset}`,
-    )
-      .then((result) => {
-        setHistory(result.items);
-        setHistoryTotal(result.total);
-        setHistoryError('');
-      })
-      .catch(() => setHistoryError('Gespeicherte Entwürfe konnten nicht geladen werden.'));
   useEffect(() => {
     request<DocumentOptions>('/api/v1/documents/options')
       .then((result) => {
@@ -59,9 +48,6 @@ export default function DocumentsPage() {
       })
       .catch((e: Error) => setError(e.message));
   }, []);
-  useEffect(() => {
-    void refreshHistory(historyOffset);
-  }, [historyOffset]);
   useEffect(() => {
     if (!year) return;
     const controller = new AbortController();
@@ -111,9 +97,10 @@ export default function DocumentsPage() {
       if (!current) return current;
       const payload = structuredClone(current.payload);
       change(payload);
-      return { ...current, payload, dirty: true, hasPdf: false };
+      return { ...current, payload, dirty: true, hasDocx: false };
     });
     setMessage('');
+    setPreviewUrl(null);
   }
   async function prepare() {
     if (!canReplace()) return;
@@ -129,7 +116,8 @@ export default function DocumentsPage() {
           body: JSON.stringify({ template_id: Number(template), year, week_id: weekId }),
         },
       );
-      setDraft({ payload: result.payload, hasPdf: false, dirty: true });
+      setDraft({ payload: result.payload, hasDocx: false, dirty: true });
+      setPreviewUrl(null);
       setWarnings(result.warnings);
       setTab('days');
     } catch (e) {
@@ -153,10 +141,9 @@ export default function DocumentsPage() {
       payload: saved.payload,
       id: saved.id,
       revision: saved.revision,
-      hasPdf: saved.has_pdf,
+      hasDocx: saved.has_docx,
       dirty: false,
     });
-    void refreshHistory();
     return saved;
   }
   async function action(generate: boolean) {
@@ -169,10 +156,31 @@ export default function DocumentsPage() {
         await request(`/api/v1/documents/${saved.id}/generate?revision=${saved.revision}`, {
           method: 'POST',
         });
-        setDraft((current) => (current ? { ...current, hasPdf: true } : current));
-        setMessage('Die Abkündigung wurde erstellt. Du kannst das PDF jetzt herunterladen.');
-        void refreshHistory();
+        setDraft((current) => (current ? { ...current, hasDocx: true } : current));
+        setMessage(
+          'Die Verkündigung wurde erstellt. Du kannst die Word-Datei jetzt herunterladen.',
+        );
       } else setMessage('Der Entwurf wurde gespeichert.');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy('');
+    }
+  }
+  async function preview() {
+    setTab('preview');
+    setBusy('preview');
+    setError('');
+    setMessage('');
+    setPreviewUrl(null);
+    try {
+      const saved = await save();
+      const result = await request<{ preview_url: string }>(
+        `/api/v1/documents/${saved.id}/preview?revision=${saved.revision}`,
+        { method: 'POST' },
+      );
+      setPreviewUrl(result.preview_url);
+      setDraft((current) => (current ? { ...current, hasDocx: true } : current));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -190,9 +198,10 @@ export default function DocumentsPage() {
         payload: saved.payload,
         id: saved.id,
         revision: saved.revision,
-        hasPdf: saved.has_pdf,
+        hasDocx: saved.has_docx,
         dirty: false,
       });
+      setPreviewUrl(null);
       setWarnings([]);
       setTab('days');
     } catch (e) {
@@ -201,17 +210,20 @@ export default function DocumentsPage() {
       setBusy('');
     }
   }
+  useEffect(() => {
+    if (documentId) void open(documentId);
+  }, [documentId]);
   return (
     <>
       <section className="page-heading">
         <div>
           <div className="eyebrow">WOCHE FÜR WOCHE VORBEREITET</div>
-          <h1>Abkündigung erstellen</h1>
-          <p>Vorlage auswählen, die Woche gestalten und als PDF herunterladen.</p>
+          <h1>Verkündigung erstellen</h1>
+          <p>Vorlage auswählen, die Woche gestalten und als Word-Datei herunterladen.</p>
         </div>
         <span className="source-pill">
           <FilePlus2 size={16} />
-          Word → PDF
+          Word (.docx)
         </span>
       </section>
       <fieldset className="creator-fieldset" disabled={!!busy}>
@@ -312,10 +324,10 @@ export default function DocumentsPage() {
             {warning}
           </div>
         ))}
-        {options && !options.pdf_available && (
+        {options && !options.preview_available && (
           <div className="import-warning">
-            Zum Erstellen der PDFs benötigt der Server Microsoft Word (Windows) oder LibreOffice.
-            Entwürfe kannst du bereits vorbereiten und speichern.
+            Für die Dokumentvorschau benötigt der Server Microsoft Word (Windows) oder LibreOffice.
+            Word-Dateien lassen sich unabhängig davon erstellen und herunterladen.
           </div>
         )}
         {draft && (
@@ -331,11 +343,11 @@ export default function DocumentsPage() {
                 {draft.dirty ? 'Änderungen noch nicht gespeichert' : 'Gespeichert'}
               </p>
             </section>
-            <div className="document-tabs" role="tablist" aria-label="Abkündigung bearbeiten">
+            <div className="document-tabs" role="tablist" aria-label="Verkündigung bearbeiten">
               {[
                 ['days', 'Gottesdienste & Heilige'],
                 ['extras', 'Termine & Kontakt'],
-                ['preview', 'Inhaltsvorschau'],
+                ['preview', 'Dokumentvorschau'],
               ].map(([value, label]) => (
                 <button
                   type="button"
@@ -345,7 +357,10 @@ export default function DocumentsPage() {
                   aria-selected={tab === value}
                   className={tab === value ? 'active' : ''}
                   key={value}
-                  onClick={() => setTab(value)}
+                  onClick={() => {
+                    if (value === 'preview') void preview();
+                    else setTab(value);
+                  }}
                 >
                   {label}
                 </button>
@@ -369,7 +384,13 @@ export default function DocumentsPage() {
                 </div>
               )}
               {tab === 'extras' && <DocumentExtras payload={draft.payload} edit={edit} />}
-              {tab === 'preview' && <DocumentPreview payload={draft.payload} />}
+              {tab === 'preview' && (
+                <DocumentPreview
+                  url={previewUrl}
+                  loading={busy === 'preview'}
+                  onRefresh={() => void preview()}
+                />
+              )}
             </div>
             <section className="list-panel document-output">
               <div>
@@ -377,8 +398,8 @@ export default function DocumentsPage() {
                 <h2>Bereit für die Gemeinde</h2>
                 <p>
                   {busy === 'generate'
-                    ? 'Word wird befüllt und nach PDF konvertiert. Das kann einen Moment dauern …'
-                    : 'Speichere den Entwurf oder erstelle die Abkündigung als PDF.'}
+                    ? 'Die Word-Datei wird erstellt …'
+                    : 'Speichere den Entwurf oder erstelle die Verkündigung als Word-Datei.'}
                 </p>
               </div>
               <div className="document-actions">
@@ -392,7 +413,7 @@ export default function DocumentsPage() {
                 </button>
                 <button type="button" className="button primary" onClick={() => void action(true)}>
                   <FilePlus2 size={16} />
-                  {busy === 'generate' ? 'PDF wird erstellt …' : 'Abkündigung erstellen'}
+                  {busy === 'generate' ? 'Word-Datei wird erstellt …' : 'Verkündigung erstellen'}
                 </button>
               </div>
             </section>
@@ -415,93 +436,17 @@ export default function DocumentsPage() {
           {message}
         </div>
       )}
-      {draft?.hasPdf && !draft.dirty && draft.id && (
+      {draft?.hasDocx && !draft.dirty && draft.id && (
         <div className="document-download">
-          <a className="button primary" href={`/api/v1/documents/${draft.id}/pdf`}>
+          <a className="button primary" href={`/api/v1/documents/${draft.id}/docx`}>
             <Download size={17} />
-            PDF herunterladen
+            Word herunterladen
           </a>
         </div>
       )}
-      <section className="list-panel document-history">
-        <div className="panel-title">
-          <h2>
-            Gespeicherte Abkündigungen <span className="count-badge">{historyTotal}</span>
-          </h2>
-        </div>
-        {historyError ? (
-          <p className="error-box" role="alert">
-            {historyError}
-          </p>
-        ) : history.length === 0 ? (
-          <p className="template-empty">Noch keine Entwürfe gespeichert.</p>
-        ) : (
-          <>
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Pfarre</th>
-                    <th>Zeitraum</th>
-                    <th>Stand</th>
-                    <th>Aktion</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.parish_name}</td>
-                      <td>
-                        {formatDate(item.start)}–{formatDate(item.end)}
-                      </td>
-                      <td>{item.has_pdf ? 'PDF erstellt' : 'Entwurf'}</td>
-                      <td>
-                        <div className="history-actions">
-                          <button
-                            type="button"
-                            className="button secondary"
-                            disabled={!!busy}
-                            onClick={() => void open(item.id)}
-                          >
-                            Öffnen
-                          </button>
-                          {item.has_pdf && (
-                            <a
-                              className="button secondary"
-                              href={`/api/v1/documents/${item.id}/pdf`}
-                            >
-                              PDF
-                            </a>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="history-pagination">
-              <button
-                className="button secondary"
-                disabled={historyOffset === 0 || !!busy}
-                onClick={() => setHistoryOffset((offset) => offset - 10)}
-              >
-                Zurück
-              </button>
-              <span>
-                {historyOffset + 1}–{Math.min(historyOffset + 10, historyTotal)} von {historyTotal}
-              </span>
-              <button
-                className="button secondary"
-                disabled={historyOffset + 10 >= historyTotal || !!busy}
-                onClick={() => setHistoryOffset((offset) => offset + 10)}
-              >
-                Weiter
-              </button>
-            </div>
-          </>
-        )}
-      </section>
+      <p className="info-note">
+        <a href="#/verkuendigungen">Gespeicherte Verkündigungen öffnen und verwalten</a>
+      </p>
     </>
   );
 }

@@ -1,18 +1,26 @@
 # Verkündigungen erstellen
 
+## Ausgabe und Pfarrvorgaben
+
+Die Ausgabe ist eine bearbeitbare Word-Datei (DOCX). Unter **Einstellungen** werden je Pfarre wiederkehrende Gottesdienste nach Wochentag, Kanzleistunden und Kontakte gespeichert und beim Laden neuer Wochen übernommen. Beide Sonntage erhalten eigene Gottesdienste mit eindeutigen IDs. Bestehende Entwürfe werden durch spätere Vorgaben nicht verändert.
+
+Die **Dokumentvorschau** rendert genau die erzeugte Word-Datei mit Microsoft Word oder LibreOffice und stellt das Ergebnis intern als PDF im Browser dar. Das PDF dient ausschließlich der Vorschau; der angebotene Download ist DOCX. Änderungen machen die bisherige Ausgabe und Vorschau ungültig. Für die Word-Ausgabe ist kein Konverter erforderlich.
+
 ## Implementierter Stand
 
-Die Erstellung ist unter **Erstellen** verfügbar. Auswahl, acht bearbeitbare Tage, zweisprachige Gottesdienste mit mehreren Intentionen, Hinweise, Ankündigungen mit Absätzen, Ewiges Licht, Kanzleistunden, Kontakte, gespeicherte Entwürfe und PDF-Download sind umgesetzt. Die Generatorauswahl verwendet das tatsächliche importierte Kirchenjahr mit dem ersten Adventssonntag; der Dezember-bis-November-Filter der Heiligenverwaltung bleibt davon unabhängig.
+Die eigene Seite **Verkündigungen** verwaltet gespeicherte Entwürfe und Ausgaben mit Öffnen, Download und bestätigtem Löschen. Die Erstellung zeigt keine zusätzliche Dokumentliste mehr. Eigene Titelzeilen werden im bestehenden `celebrations`-Array mit `source_celebration_id: null` gespeichert. Jede aktive Titelzeile wird als eigener vollständig fetter Absatz mit beiden vorhandenen Sprachen ausgegeben. Alle verfügbaren Heiligen werden in neu geladenen Wochen zunächst eingeblendet; bestehende Auswahlen werden nicht nachträglich verändert.
+
+Die Erstellung ist unter **Erstellen** verfügbar. Auswahl, acht bearbeitbare Tage, zweisprachige Gottesdienste mit mehreren Intentionen, Hinweise, Ankündigungen mit Absätzen, Ewiges Licht, Kanzleistunden, Kontakte, gespeicherte Entwürfe und Word-Download sind umgesetzt. Die Generatorauswahl verwendet das tatsächliche importierte Kirchenjahr mit dem ersten Adventssonntag; der Dezember-bis-November-Filter der Heiligenverwaltung bleibt davon unabhängig.
 
 Das verbindliche Schema liegt in `verkuendigungen/schemas/documents.py`. `template_id` ist eine numerische Vorlagen-ID; ID 0 steht für die eingebaute Eberndorfer Vorlage. `template_version` ist der SHA-256 der Originaldatei. `selection.week_id` hält zusätzlich die eindeutige Wochenkennung fest. Die ursprüngliche JSON-Strukturvorlage unten dient weiterhin als Beispiel und enthält nur einen exemplarischen Tag.
 
-`document_payloads` speichert das gesamte JSON und die Originalvorlage als Momentaufnahme. Die Revision verhindert unbeabsichtigtes Überschreiben durch parallele Bearbeitung. Jede Änderung entfernt die bisherige Ausgabe. DOCX und PDF werden aus demselben gespeicherten Stand erzeugt und nur angehängt, wenn sich dessen Revision währenddessen nicht geändert hat.
+`document_payloads` speichert das gesamte JSON und die Originalvorlage als Momentaufnahme. Die Revision verhindert unbeabsichtigtes Überschreiben durch parallele Bearbeitung. Jede Änderung entfernt die bisherige Ausgabe. Word-Datei und interne Vorschau werden aus demselben gespeicherten Stand erzeugt und nur angehängt, wenn sich dessen Revision währenddessen nicht geändert hat.
 
 Der Renderer unterstützt die vorhandene vierteilige Wochentabelle. Logo, Titel, Seitengeometrie und alle unveränderten ZIP-Bestandteile bleiben erhalten. Tageszeilen werden aus den Tabellenzellen der Vorlage abgeleitet; Termine, Ewiges Licht, Kanzleistunden und Kontakt werden mit den aktuellen Angaben befüllt. Eigene Vorlagen können alternativ einen separaten Absatz `{{inhalt}}` für die gesamten dynamischen Inhalte verwenden; optionale Textmarker im Dokumentkörper sind `{{pfarre}}`, `{{von}}` und `{{bis}}`. Beliebige Word-Dateien ohne eine dieser Strukturen können gespeichert, aber nicht automatisch zugeordnet werden; die Auswahl kennzeichnet sie entsprechend.
 
-Die PDF-Konvertierung verwendet LibreOffice, sofern gefunden, ansonsten unter Windows Microsoft Word im Hintergrund. Bei fehlgeschlagener Konvertierung bleibt der Entwurf gespeichert. Für den Betrieb in einem Linux-Container muss LibreOffice installiert werden. Für den lokalen Windows-Betrieb mit Word ist kein Container erforderlich.
+Die interne Vorschaukonvertierung verwendet LibreOffice, sofern gefunden, ansonsten unter Windows Microsoft Word im Hintergrund. Bei fehlgeschlagener Konvertierung bleibt der Entwurf gespeichert. Für den Betrieb in einem Linux-Container muss LibreOffice installiert werden. Für den lokalen Windows-Betrieb mit Word ist kein Container erforderlich.
 
-Die Anwendung erstellt zweisprachige Verkündigungen für die Diözese Gurk. Mitarbeitende wählen ein Kirchenjahr, eine liturgische Zeit und deren Woche, beispielsweise „2026/27 → Advent → 1. Woche“. Die Anwendung berechnet daraus den Zeitraum vom ersten bis einschließlich des folgenden Sonntags. Das gewünschte Endprodukt ist ein PDF auf Grundlage der austauschbaren Word-Vorlage.
+Die Anwendung erstellt zweisprachige Verkündigungen für die Diözese Gurk. Mitarbeitende wählen ein Kirchenjahr, eine liturgische Zeit und deren Woche, beispielsweise „2026/27 → Advent → 1. Woche“. Die Anwendung berechnet daraus den Zeitraum vom ersten bis einschließlich des folgenden Sonntags. Das gewünschte Endprodukt ist eine bearbeitbare DOCX-Datei auf Grundlage der austauschbaren Word-Vorlage.
 
 ## Ablauf
 
@@ -21,7 +29,7 @@ Die Anwendung erstellt zweisprachige Verkündigungen für die Diözese Gurk. Mit
 3. Die gültigen Sonntage, Feste, Heiligen und Gedenktage aus der Datenbank laden. Deaktivierte Einträge und die liturgische Rangordnung berücksichtigen. Alle acht Tage des Zeitraums zunächst bereitstellen.
 4. Das vollständige JSON in die Bearbeitungsoberfläche laden. Mitarbeitende können Texte ändern, Tage ausblenden sowie Gottesdienste, Orte, Uhrzeiten, Messintentionen, Hinweise und Termine ergänzen.
 5. Den bearbeiteten Inhalt als Ganzes in `document_payloads.payload_json` speichern. Eine erneute Datenübernahme darf manuelle Änderungen nicht unbemerkt überschreiben. Eine Änderung der Wochenauswahl erzeugt einen neuen Entwurf oder benötigt eine ausdrückliche Übernahme in den bestehenden Entwurf.
-6. Das gespeicherte JSON prüfen, die Word-Vorlage füllen und das resultierende Dokument nach PDF konvertieren. Das PDF zum Download anbieten. DOCX ist das interne Zwischenformat; ein zusätzlicher Word-Download kann später ergänzt werden.
+6. Das gespeicherte JSON prüfen, die Word-Vorlage füllen; für die Vorschau das resultierende Dokument intern konvertieren. Die DOCX-Datei zum Download anbieten. Eine interne PDF-Konvertierung wird nur für die layoutgetreue Vorschau verwendet.
 
 ## JSON-Vertrag
 
@@ -45,6 +53,6 @@ Das JSON enthält eine vollständige Momentaufnahme einschließlich Texten und K
 
 Datumsformat und Wochentagsnamen entstehen aus dem ISO-Datum. Schrift, Tabellenbreiten, feste Beschriftungen und die Anordnung der Sprachen bleiben in der Word-Vorlage. Leere Texte und deaktivierte Einträge werden nicht gedruckt. Eine fehlende Uhrzeit wird als leere Zelle dargestellt; ein Gottesdienst muss keine Uhrzeit haben, solange er noch im Entwurf ist.
 
-Vor der PDF-Ausgabe werden Datumsbereich, eindeutige IDs, gültige Uhrzeiten und mindestens ein sichtbarer Inhalt geprüft. Die Dokumenterzeugung muss Tabellen mit mehreren Intentionen und langen Terminen über Seitengrenzen hinweg sauber darstellen. Das ausgefüllte Beispiel zeigt zudem, dass Tage ohne relevante Inhalte ausgelassen werden können; eine automatische Ausblendung solcher Tage ist zusätzlich zu den manuellen Schaltern sinnvoll.
+Vor der Dokumentausgabe werden Datumsbereich, eindeutige IDs, gültige Uhrzeiten und mindestens ein sichtbarer Inhalt geprüft. Die Dokumenterzeugung muss Tabellen mit mehreren Intentionen und langen Terminen über Seitengrenzen hinweg sauber darstellen. Das ausgefüllte Beispiel zeigt zudem, dass Tage ohne relevante Inhalte ausgelassen werden können; eine automatische Ausblendung solcher Tage ist zusätzlich zu den manuellen Schaltern sinnvoll.
 
 Dieser Ablauf konkretisiert die bisherige README: Das Ausgabeziel ist PDF, und die Auswahl erfolgt über die liturgische Woche. Der Directorium-Import und die Verwaltung der Heiligen bleiben die Grundlage dafür.

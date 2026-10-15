@@ -111,6 +111,7 @@ export default function TemplatesPage() {
             <input
               required
               type="file"
+              className="word-file-input"
               accept=".docx"
               disabled={busy}
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
@@ -206,7 +207,7 @@ export default function TemplatesPage() {
       <p className="info-note">
         Für die Erstellung wird die vorhandene Wochentabelle unterstützt. Eigene Vorlagen können
         einen separaten Absatz mit {'{{inhalt}}'} für die Wocheninhalte enthalten. Die Auswahl
-        erfolgt unter <a href="#/erstellen">Abkündigung erstellen</a>.
+        erfolgt unter <a href="#/erstellen">Verkündigung erstellen</a>.
       </p>
     </>
   );

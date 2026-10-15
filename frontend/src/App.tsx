@@ -11,6 +11,8 @@ import {
 import SaintsPage from './SaintsPage';
 import TemplatesPage from './TemplatesPage';
 import DocumentsPage from './DocumentsPage';
+import SettingsPage from './SettingsPage';
+import DocumentArchivePage from './DocumentArchivePage';
 
 export default function App() {
   const [route, setRoute] = useState(window.location.hash);
@@ -21,7 +23,9 @@ export default function App() {
   }, []);
   const isSaints = route === '#/heilige';
   const isTemplates = route === '#/vorlagen';
-  const isDocuments = route === '#/erstellen';
+  const isDocuments = route === '#/erstellen' || route.startsWith('#/erstellen/');
+  const isArchive = route === '#/verkuendigungen';
+  const isSettings = route === '#/einstellungen';
   return (
     <>
       <a className="skip-link" href="#main">
@@ -38,8 +42,16 @@ export default function App() {
           <nav aria-label="Hauptnavigation">
             <a
               href="#/"
-              className={!isSaints && !isTemplates && !isDocuments ? 'active' : ''}
-              aria-current={!isSaints && !isTemplates && !isDocuments ? 'page' : undefined}
+              className={
+                !isSaints && !isTemplates && !isDocuments && !isSettings && !isArchive
+                  ? 'active'
+                  : ''
+              }
+              aria-current={
+                !isSaints && !isTemplates && !isDocuments && !isSettings && !isArchive
+                  ? 'page'
+                  : undefined
+              }
             >
               <CalendarDays size={17} />
               Übersicht
@@ -68,6 +80,20 @@ export default function App() {
               <FileText size={17} />
               Vorlagen
             </a>
+            <a
+              href="#/einstellungen"
+              className={isSettings ? 'active' : ''}
+              aria-current={isSettings ? 'page' : undefined}
+            >
+              Einstellungen
+            </a>
+            <a
+              href="#/verkuendigungen"
+              className={isArchive ? 'active' : ''}
+              aria-current={isArchive ? 'page' : undefined}
+            >
+              Verkündigungen
+            </a>
           </nav>
         </div>
       </header>
@@ -80,14 +106,22 @@ export default function App() {
               : isTemplates
               ? 'Word-Vorlagen'
               : isDocuments
-              ? 'Abkündigung erstellen'
+              ? 'Verkündigung erstellen'
+              : isSettings
+              ? 'Default-Einstellungen'
+              : isArchive
+              ? 'Verkündigungen'
               : 'Übersicht'}
           </span>
         </div>
         {isSaints ? (
           <SaintsPage />
+        ) : isArchive ? (
+          <DocumentArchivePage />
+        ) : isSettings ? (
+          <SettingsPage />
         ) : isDocuments ? (
-          <DocumentsPage />
+          <DocumentsPage documentId={Number(route.split('/')[2]) || undefined} />
         ) : isTemplates ? (
           <TemplatesPage />
         ) : (
@@ -107,7 +141,7 @@ export default function App() {
                 einem Ort.
               </p>
               <a className="button primary" href="#/erstellen">
-                Abkündigung erstellen <ArrowRight size={17} />
+                Verkündigung erstellen <ArrowRight size={17} />
               </a>
               <div className="hero-ornament" aria-hidden="true">
                 <Church size={170} strokeWidth={0.7} />
@@ -122,7 +156,7 @@ export default function App() {
                 <h2>Eine Woche. Eine Verkündigung.</h2>
                 <p>
                   Eine liturgische Woche auswählen, Gottesdienste und Intentionen ergänzen und die
-                  Abkündigung auf Grundlage deiner Word-Vorlage als PDF erstellen.
+                  Verkündigung als bearbeitbare Word-Datei erstellen.
                 </p>
                 <span className="text-link">
                   Zur Erstellung <ArrowRight size={16} />

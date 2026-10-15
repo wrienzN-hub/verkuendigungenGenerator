@@ -105,18 +105,25 @@ Fehlende Kalendertage verhindern den Import nicht, sofern mindestens 90 % des Ki
 
 `GET /api/v1/templates/{id}/source` lädt die unveränderte Originaldatei herunter; unbekannte IDs liefern HTTP 404. Die Datei wird gemeinsam mit ihren Metadaten in SQLite gespeichert und ist damit Bestandteil einer Datenbanksicherung.
 
-Die React-Seite `#/vorlagen` bietet Upload, Pfarrfilter und Download. Unter `#/erstellen` können unterstützte Vorlagen befüllt und als PDF ausgegeben werden.
+Die React-Seite `#/vorlagen` bietet Upload, Pfarrfilter und Download. Unter `#/erstellen` können unterstützte Vorlagen befüllt und als DOCX ausgegeben werden.
 
-## Abkündigungen
+## Verkündigungen
 
-- `GET /api/v1/documents/options`: Kirchenjahre, Vorlagen einschließlich der eingebauten Eberndorfer Vorlage (ID 0), deren `supported`-Status und `pdf_available` (installierter Konverter erkannt).
+- `GET /api/v1/documents/options`: Kirchenjahre, Vorlagen einschließlich der eingebauten Eberndorfer Vorlage (ID 0), deren `supported`-Status und `preview_available` (installierter Konverter erkannt).
 - `GET /api/v1/documents/weeks?year=2026%2F27`: Wochen des tatsächlichen importierten Kirchenjahres einschließlich des ersten Adventssonntags im November. Anders als der Verwaltungsfilter wird der Zeitraum nicht am 1. Dezember abgeschnitten.
-- `POST /api/v1/documents/prepare`: `{ "template_id": 0, "year": "2026/27", "week_id": "advent:2026-11-29" }` liefert `{payload,warnings}` mit allen acht Tagen. Es wird noch nichts gespeichert. Deaktivierte, verdrängte und bedingte Feiern werden ausgelassen. Wahlweise Feiern und Kommemorationen bleiben zur manuellen Auswahl zunächst ausgeschaltet.
-- `POST /api/v1/documents`: `{payload}` speichert einen neuen Entwurf und eine unveränderliche Kopie der Word-Vorlage (HTTP 201). Die Antwort enthält `id`, `revision`, `payload`, `has_pdf`, Zeitstempel.
+- `POST /api/v1/documents/prepare`: `{ "template_id": 0, "year": "2026/27", "week_id": "advent:2026-11-29" }` liefert `{payload,warnings}` mit allen acht Tagen. Es wird noch nichts gespeichert. Deaktivierte, verdrängte und bedingte Feiern werden ausgelassen. Alle verfügbaren Feiern einschließlich wahlweiser Gedenktage und Kommemorationen sind als Titel sichtbar; sie können im Entwurf einzeln ausgeblendet werden.
+- `POST /api/v1/documents`: `{payload}` speichert einen neuen Entwurf und eine unveränderliche Kopie der Word-Vorlage (HTTP 201). Die Antwort enthält `id`, `revision`, `payload`, `has_docx`, `has_pdf` (interne Vorschau), Zeitstempel.
 - `GET /api/v1/documents?limit=20&offset=0`: paginierte Metadaten `{items,total}`. `GET /api/v1/documents/{id}` öffnet einen Entwurf.
-- `PUT /api/v1/documents/{id}`: `{payload,revision}` ersetzt den bearbeiteten Inhalt. Vorlage, Wochenauswahl und Zeitraum bleiben fest. Änderungen erhöhen die Revision und entfernen eine frühere PDF-Ausgabe. Veraltete Revisionen liefern HTTP 409.
-- `POST /api/v1/documents/{id}/generate?revision=1`: erzeugt DOCX und PDF aus dem gespeicherten Stand und der gespeicherten Vorlage. Liefert `pdf_url`. Ein Konvertierungsfehler liefert HTTP 503; der Entwurf bleibt gespeichert. Änderungen während der Konvertierung verhindern das Speichern eines veralteten PDFs (HTTP 409).
-- `GET /api/v1/documents/{id}/pdf`: Download des PDFs zum aktuellen gespeicherten Stand. Vor der Erstellung bzw. nach einer Änderung HTTP 404.
+- `PUT /api/v1/documents/{id}`: `{payload,revision}` ersetzt den bearbeiteten Inhalt. Vorlage, Wochenauswahl und Zeitraum bleiben fest. Änderungen erhöhen die Revision und entfernen frühere Word-Ausgaben und Vorschauen. Veraltete Revisionen liefern HTTP 409.
+- `POST /api/v1/documents/{id}/generate?revision=1`: erzeugt nur die DOCX-Datei aus dem gespeicherten Stand und der gespeicherten Vorlage. Liefert `docx_url`; benötigt weder Word noch LibreOffice.
+- `GET /api/v1/documents/{id}/docx`: Download der erzeugten Word-Datei; vor der Erstellung bzw. nach einer Änderung HTTP 404.
+- `DELETE /api/v1/documents/{id}?revision=1`: löscht Entwurf und erzeugte Dateien. Eine inzwischen geänderte Revision liefert HTTP 409. Vorlage und Pfarrvorgaben bleiben erhalten.
+- `POST /api/v1/documents/{id}/preview?revision=1`: rendert dieselbe DOCX-Datei mit Word/LibreOffice für eine layoutgetreue Vorschau. Liefert `preview_url`. Konvertierungsfehler liefern HTTP 503; Word-Ausgabe bleibt unabhängig möglich. Änderungen während der Konvertierung verhindern die Zuordnung einer veralteten Vorschau (HTTP 409).
+- `GET /api/v1/documents/{id}/preview?revision=1`: interne Vorschau als inline dargestelltes PDF mit `Cache-Control: no-store`. Eine veraltete Revision liefert HTTP 409. Es gibt keinen PDF-Download in der Oberfläche.
+
+## Pfarrvorgaben
+
+`GET /api/v1/settings?parish=Eberndorf` liefert `{services,office_hours,contact}`. Für Pfarren ohne Vorgaben werden leere Listen und Kontakte geliefert. `PUT` auf denselben Endpunkt speichert diese Struktur transaktional. `services` entspricht dem Service-Modell des Dokument-Payloads, ergänzt um `weekday` (0 = Montag bis 6 = Sonntag). `enabled: false` deaktiviert eine Regel. Uhrzeiten und Kanzleistunden werden wie im Dokument validiert. Regeln gelten nur für neu geladene Wochen; neue IDs je Tag verhindern Konflikte bei beiden Sonntagen.
 
 Die vollständigen validierten Payload-Modelle sind unter `/docs` und in `schemas/documents.py` dokumentiert. Ungültige Zeitangaben, doppelte IDs, abweichende Tage oder Wochenauswahlen liefern HTTP 422. Word-Makros und automatische Link-/Feldupdates sind bei der Konvertierung deaktiviert.
 

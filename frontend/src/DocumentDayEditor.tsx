@@ -48,10 +48,10 @@ export default function DocumentDayEditor({
           />
           Diesen Tag ausgeben
         </label>
-        <h3>Heilige und Gedenktage</h3>
+        <h3>Titelzeilen und Heilige</h3>
         <p className="field-help">
-          Aus dem Directorium übernommen. Wahlweise Gedenktage sind zunächst ausgeschaltet. Texte
-          und Auswahl gelten nur für diesen Entwurf.
+          Aktive Heilige werden als Titel übernommen. Ergänze darunter zum Beispiel Kirchtag und
+          Erntedank. Jede Zeile wird Deutsch | Slowenisch und vollständig fett ausgegeben.
         </p>
         {day.celebrations.map((celebration, index) => (
           <div className="document-item" key={celebration.id}>
@@ -66,10 +66,10 @@ export default function DocumentDayEditor({
                     })
                   }
                 />
-                Feier ausgeben
+                Titelzeile ausgeben
               </label>
               <RemoveButton
-                label="Feier entfernen"
+                label="Titelzeile entfernen"
                 onClick={() =>
                   edit((d) => {
                     d.celebrations.splice(index, 1);
@@ -78,7 +78,7 @@ export default function DocumentDayEditor({
               />
             </div>
             <TextFields
-              label="Bezeichnung"
+              label="Titelzeile"
               value={celebration.title}
               onChange={(value) =>
                 edit((d) => {
@@ -103,7 +103,7 @@ export default function DocumentDayEditor({
             })
           }
         >
-          + Feier ergänzen
+          + Titelzeile hinzufügen
         </button>
         <h3>Gottesdienste</h3>
         {day.services.map((service, index) => (
@@ -164,6 +164,10 @@ export default function DocumentDayEditor({
               }
             />
             <h4>Messintentionen</h4>
+            <p className="field-help">
+              Gebetsanliegen dieser Messe, z. B. für verstorbene Angehörige. Das Zeichen und eine
+              optionale Referenz werden mit ausgegeben.
+            </p>
             {service.intentions.map((intention, intentionIndex) => (
               <div className="document-item" key={intention.id}>
                 <div className="document-item-bar">
@@ -244,6 +248,10 @@ export default function DocumentDayEditor({
               + Intention hinzufügen
             </button>
             <h4>Hinweise zum Gottesdienst</h4>
+            <p className="field-help">
+              Zusätzliche Informationen, z. B. eine Kollekte. Für fette Überschriften wie Erntedank
+              oben eine Titelzeile ergänzen.
+            </p>
             <NoticeFields
               notices={service.notices}
               onChange={(value) =>

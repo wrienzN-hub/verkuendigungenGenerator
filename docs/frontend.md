@@ -67,13 +67,21 @@ Unterstützt werden PDF-Dateien bis 25 MB mit auswählbarem Text im Gurker Monat
 
 Fehlende Kalendertage verhindern den Import nicht, sofern mindestens 90 % des Kirchenjahres erkannt wurden. Der Importbericht enthält `missing_dates` (ISO-Daten) und `expected_calendar_days`. Die Oberfläche zeigt die Lücken nach dem Upload und dauerhaft bei den vorhandenen Directorien an. Für fehlende Tage entstehen keine erfundenen Feiern oder Quellenabschnitte.
 
-## Abkündigungen erstellen
+## Pfarrvorgaben
 
-Die Navigation **Erstellen** (`#/erstellen`) führt durch Auswahl, Bearbeitung und PDF-Ausgabe. **Woche laden** erzeugt einen neuen Entwurf; ein Bestätigungsdialog schützt ungespeicherte Änderungen beim Wechsel zu einem anderen Entwurf. Ein Entwurf wird zusätzlich lokal im Browser zwischengespeichert. **Entwurf speichern** legt ihn samt Word-Vorlage auf dem Server ab. Der Browser-Zwischenspeicher ist kein Ersatz für diese Speicherung.
+Unter **Einstellungen** (`#/einstellungen`) werden wiederkehrende Gottesdienste, Kanzleistunden und Kontakte getrennt nach Pfarre gespeichert. Jeder Gottesdienst hat einen Wochentag, eine optionale Uhrzeit, einen Ort und eine zweisprachige Bezeichnung. Mehrere Vorgaben für denselben Wochentag sind möglich. Deaktivierte Vorgaben werden nicht übernommen.
 
-Die Bearbeitung gliedert sich in **Gottesdienste & Heilige**, **Termine & Kontakt** und **Inhaltsvorschau**. Die Inhaltsvorschau zeigt Texte; das Layout des PDFs kommt aus der Word-Vorlage. Leere Tage werden in der Ausgabe ausgelassen. Bestehende Originaltexte aus der Vorlage werden in den variablen Bereichen ersetzt, damit keine alten Termine oder Kontaktpersonen übernommen werden.
+## Verkündigungen erstellen
 
-**Abkündigung erstellen** speichert den aktuellen Entwurf und konvertiert ihn nach PDF. Der Download erscheint nach erfolgreicher Erstellung. Änderungen blenden diesen Download aus, bis erneut ein PDF erstellt wurde. Die Liste unten zeigt gespeicherte Entwürfe mit Paging und ermöglicht das erneute Öffnen.
+Unter **Erstellen** (`#/erstellen`) Pfarre, Vorlage und liturgische Woche wählen. **Woche laden** erstellt acht Tage von Sonntag bis zum folgenden Sonntag und übernimmt die aktuellen Pfarrvorgaben, auch für beide Sonntage. Änderungen an Vorgaben verändern gespeicherte Entwürfe nicht.
+
+Die Bearbeitung gliedert sich in **Gottesdienste & Heilige**, **Termine & Kontakt** und **Dokumentvorschau**. Beim Öffnen oder Aktualisieren der Vorschau wird der Entwurf gespeichert. Die Vorschau zeigt die tatsächlich erzeugte Word-Datei nach einer internen Konvertierung, einschließlich Bildern, Tabellen und Seitenumbrüchen. Microsoft Word oder LibreOffice wird nur für diese Vorschau benötigt. Änderungen machen die bisherige Vorschau ungültig.
+
+**Verkündigung erstellen** speichert den aktuellen Stand und erzeugt eine bearbeitbare DOCX-Datei. **Word herunterladen** lädt diese Datei herunter. Dafür wird kein PDF-Konverter benötigt. Nach Änderungen muss die Word-Datei erneut erstellt werden. Die separate Seite **Verkündigungen** (`#/verkuendigungen`) zeigt gespeicherte Entwürfe mit Paging, Öffnen, Word-Download und bestätigtem Löschen. Der Browser speichert den aktuellen Entwurf zusätzlich lokal zwischen; diese Kopie ersetzt das Speichern auf dem Server nicht.
+
+Aktive und verfügbare Heilige werden beim Laden neuer Wochen als sichtbare Titel übernommen, auch wahlweise Gedenktage. Bestehende Entwürfe behalten ihre Auswahl. Unter **Titelzeilen und Heilige** können eigene Zeilen wie Kirchtag und Erntedank ergänzt werden; jede Zeile erscheint als **Deutsch | Slowenisch** vollständig fett. Messintentionen sind Gebetsanliegen mit optionalem Zeichen und Referenz; Hinweise sind normale Zusatzinformationen.
+
+Bei der alten Gurker Vorlage mit zwei übereinanderliegenden Vollbreiten-Bannern in einem schwebenden Textfeld wird nur die erzeugte Ausgabe bereinigt. Die Originaldatei bleibt unverändert. Kanzleistunden und Kontakte nutzen die Rahmen und Paragraphen der gewählten Vorlage; Kontakte werden links und rechts angeordnet.
 
 ## Verwaltungsfilter für liturgische Wochen
 

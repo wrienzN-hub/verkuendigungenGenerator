@@ -1685,6 +1685,62 @@ tbody tr:hover {
 .contact-person > label {
   min-width: 0;
 }
+.contact-person > .remove-item,
+.office-row > .remove-item {
+  position: static;
+  align-self: end;
+  height: 38px;
+  min-width: 38px;
+  justify-content: center;
+  align-items: center;
+  margin: 0;
+}
+.history-actions {
+  align-items: center;
+}
+.history-actions > .remove-item {
+  align-self: center;
+  height: 38px;
+  min-width: 38px;
+  justify-content: center;
+  align-items: center;
+}
+.button.danger {
+  background: #9f483d;
+  color: white;
+  border: 1px solid #9f483d;
+}
+.word-file-input {
+  padding: 0 !important;
+  height: 42px;
+  min-height: 42px;
+  line-height: 40px;
+  overflow: hidden;
+  color: #65705f;
+  cursor: pointer;
+}
+.word-file-input::file-selector-button {
+  font: inherit;
+  color: #315d48;
+  background: #edf2e8;
+  border: 0;
+  border-right: 1px solid #dce3d7;
+  height: 40px;
+  line-height: 20px;
+  padding: 0 16px;
+  vertical-align: top;
+  margin: 0 14px 0 0;
+  cursor: pointer;
+}
+@media (max-width: 1150px) {
+  .header-inner {
+    gap: 24px;
+  }
+  .header-inner nav {
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+}
 .announcement-paragraph {
   position: relative;
   padding-right: 42px;
@@ -1701,6 +1757,38 @@ tbody tr:hover {
   padding: 35px;
   margin: 20px auto;
   overflow-wrap: anywhere;
+}
+.word-pages {
+  display: block;
+  width: 100%;
+  max-height: 85vh;
+  overflow: auto;
+  border: 1px solid #dce3d7;
+  margin-top: 20px;
+  background: #eee;
+  padding: 20px;
+}
+.word-pages figure {
+  margin: 0 auto 20px;
+  max-width: 900px;
+}
+.word-pages canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: white;
+  box-shadow: 0 2px 12px #0002;
+}
+.word-pages figcaption {
+  text-align: center;
+  font-size: 11px;
+  padding: 10px;
+  color: #65705f;
+}
+@media (max-width: 700px) {
+  .word-pages {
+    padding: 8px;
+  }
 }
 .document-preview section {
   border-top: 1px solid #e6ebdf;
