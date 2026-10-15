@@ -78,11 +78,22 @@ def prepare(conn, template_id, year, week_id):
                 for item in [*service['intentions'], *service['notices']]:
                     item['id'] = str(uuid4())
                 day['services'].append(service)
+    from .dated_services import read_services
+    for day in days:
+        saved = read_services(conn, template['parish_name'], day['date'])
+        day['services_revision'] = saved['revision']
+        if saved['revision']:
+            day['services'] = saved['services']
+        for service in day['services']:
+            service['title'] = {'de': '', 'sl': ''}
+    assigned = []
+    for row in conn.execute("SELECT text_json FROM events WHERE EXISTS (SELECT 1 FROM json_each(parishes_json) WHERE value=? COLLATE NOCASE) AND EXISTS (SELECT 1 FROM json_each(weeks_json) WHERE json_extract(value,'$.year')=? AND json_extract(value,'$.week_id')=?) ORDER BY name COLLATE NOCASE,id", (template['parish_name'], year, week_id)):
+        assigned.append({'id': str(uuid4()), 'enabled': True, 'title': {'de': '', 'sl': ''}, 'paragraphs': [json.loads(row[0])]})
     payload = DocumentPayload.model_validate({'schema_version': 1, 'template_id': template_id, 'template_version': hashlib.sha256(template['docx']).hexdigest(),
         'parish': {'id': template['parish_name'], 'name': {'de': template['parish_name'], 'sl': ''}},
         'selection': {'liturgical_year': year, 'season': week['season'], 'week': week['week'], 'week_id': week_id},
         'period': {'start': start, 'end': end}, 'days': days,
-        'office_hours': settings.model_dump(mode='json', by_alias=True)['office_hours'],
+        'announcements': assigned, 'office_hours': settings.model_dump(mode='json', by_alias=True)['office_hours'],
         'contact': settings.contact.model_dump(mode='json')})
     warnings = ['Für folgende Tage fehlen Kalenderdaten: ' + ', '.join(missing) + '. Bitte die Einträge ergänzen.'] if missing else []
     return {'payload': payload.model_dump(mode='json', by_alias=True), 'warnings': warnings}

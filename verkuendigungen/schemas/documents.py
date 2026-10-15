@@ -12,9 +12,28 @@ class Model(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
 
+class TextMark(Model):
+    start: int = Field(ge=0)
+    end: int = Field(ge=1)
+    underline: StrictBool = False
+    bold: StrictBool
+
+
 class Bilingual(Model):
     de: Text = ''
     sl: Text = ''
+    de_marks: list[TextMark] = Field(default_factory=list, max_length=500)
+    sl_marks: list[TextMark] = Field(default_factory=list, max_length=500)
+
+    @model_validator(mode='after')
+    def valid_marks(self):
+        for language in ['de', 'sl']:
+            previous = 0
+            for mark in getattr(self, language + '_marks'):
+                if mark.start < previous or mark.end <= mark.start or mark.end > len(getattr(self, language)):
+                    raise ValueError('Textformatierungen müssen zum Text passen und dürfen sich nicht überlappen.')
+                previous = mark.end
+        return self
 
 
 class Visible(Model):
@@ -30,6 +49,7 @@ class Celebration(Visible):
 
 class Notice(Visible):
     text: Bilingual
+    source_event_id: int | None = Field(default=None, ge=1)
 
 
 class Intention(Notice):
@@ -45,7 +65,14 @@ class Service(Visible):
     notices: list[Notice] = Field(default_factory=list, max_length=30)
 
 
+    @model_validator(mode='after')
+    def omit_service_title(self):
+        self.title = Bilingual()
+        return self
+
+
 class Day(Visible):
+    services_revision: int = Field(default=0, ge=0)
     date: date
     celebrations: list[Celebration] = Field(default_factory=list, max_length=30)
     services: list[Service] = Field(default_factory=list, max_length=30)

@@ -27,6 +27,7 @@ export default function DocumentsPage({ documentId }: { documentId?: number }) {
   const [template, setTemplate] = useState('');
   const [year, setYear] = useState('');
   const [weeks, setWeeks] = useState<LiturgicalWeek[]>([]);
+  const [weekSearch, setWeekSearch] = useState('');
   const [weekId, setWeekId] = useState('');
   const [weeksLoading, setWeeksLoading] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(recover);
@@ -270,6 +271,13 @@ export default function DocumentsPage({ documentId }: { documentId?: number }) {
             </label>
             <label>
               Liturgische Woche
+              <input
+                type="search"
+                aria-label="Liturgische Wochen suchen"
+                placeholder="Wochen suchen …"
+                value={weekSearch}
+                onChange={(e) => setWeekSearch(e.target.value)}
+              />
               <select
                 value={weekId}
                 disabled={weeksLoading}
@@ -286,7 +294,16 @@ export default function DocumentsPage({ documentId }: { documentId?: number }) {
                     label={weeks.find((w) => w.season === season)?.season_label}
                   >
                     {weeks
-                      .filter((w) => w.season === season)
+                      .filter(
+                        (w) =>
+                          w.season === season &&
+                          (w.id === weekId ||
+                            `${w.label} ${w.season_label} ${formatDate(w.start)} ${formatDate(
+                              w.end,
+                            )}`
+                              .toLocaleLowerCase('de')
+                              .includes(weekSearch.toLocaleLowerCase('de'))),
+                      )
                       .map((week) => (
                         <option key={week.id} value={week.id}>
                           {week.label} · {formatDate(week.start)}–{formatDate(week.end)}
@@ -346,7 +363,8 @@ export default function DocumentsPage({ documentId }: { documentId?: number }) {
             <div className="document-tabs" role="tablist" aria-label="Verkündigung bearbeiten">
               {[
                 ['days', 'Gottesdienste & Heilige'],
-                ['extras', 'Termine & Kontakt'],
+                ['extras', 'Termine'],
+                ['contacts', 'Kontakte'],
                 ['preview', 'Dokumentvorschau'],
               ].map(([value, label]) => (
                 <button
@@ -369,11 +387,14 @@ export default function DocumentsPage({ documentId }: { documentId?: number }) {
             <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
               {tab === 'days' && (
                 <div className="document-days">
+                  <p className="field-help">
+                    Beim Speichern werden Gottesdienste und Intentionen für dieses Datum hinterlegt.
+                    Eine neu geladene Nachbarwoche übernimmt den gemeinsamen Sonntag automatisch.
+                  </p>
                   {draft.payload.days.map((day, index) => (
                     <DocumentDayEditor
                       key={day.id}
                       day={day}
-                      first={index === 0}
                       onChange={(value) =>
                         edit((p) => {
                           p.days[index] = value;
@@ -383,7 +404,9 @@ export default function DocumentsPage({ documentId }: { documentId?: number }) {
                   ))}
                 </div>
               )}
-              {tab === 'extras' && <DocumentExtras payload={draft.payload} edit={edit} />}
+              {(tab === 'extras' || tab === 'contacts') && (
+                <DocumentExtras key={tab} mode={tab} payload={draft.payload} edit={edit} />
+              )}
               {tab === 'preview' && (
                 <DocumentPreview
                   url={previewUrl}

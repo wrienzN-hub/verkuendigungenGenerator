@@ -7,12 +7,18 @@ import {
   ChevronRight,
   Sprout,
   FileText,
+  FilePlus2,
+  Files,
+  House,
+  Settings,
 } from 'lucide-react';
 import SaintsPage from './SaintsPage';
 import TemplatesPage from './TemplatesPage';
 import DocumentsPage from './DocumentsPage';
 import SettingsPage from './SettingsPage';
 import DocumentArchivePage from './DocumentArchivePage';
+import EventsPage from './EventsPage';
+import ServicesPage from './ServicesPage';
 
 export default function App() {
   const [route, setRoute] = useState(window.location.hash);
@@ -26,6 +32,8 @@ export default function App() {
   const isDocuments = route === '#/erstellen' || route.startsWith('#/erstellen/');
   const isArchive = route === '#/verkuendigungen';
   const isSettings = route === '#/einstellungen';
+  const isEvents = route === '#/termine';
+  const isServices = route === '#/gottesdienste';
   return (
     <>
       <a className="skip-link" href="#main">
@@ -40,60 +48,48 @@ export default function App() {
             <span>Verkündigungen</span>
           </a>
           <nav aria-label="Hauptnavigation">
-            <a
-              href="#/"
-              className={
-                !isSaints && !isTemplates && !isDocuments && !isSettings && !isArchive
-                  ? 'active'
-                  : ''
-              }
-              aria-current={
-                !isSaints && !isTemplates && !isDocuments && !isSettings && !isArchive
-                  ? 'page'
-                  : undefined
-              }
-            >
-              <CalendarDays size={17} />
-              Übersicht
-            </a>
-            <a
-              href="#/erstellen"
-              className={isDocuments ? 'active' : ''}
-              aria-current={isDocuments ? 'page' : undefined}
-            >
-              <FileText size={17} />
-              Erstellen
-            </a>
-            <a
-              href="#/heilige"
-              className={isSaints ? 'active' : ''}
-              aria-current={isSaints ? 'page' : undefined}
-            >
-              <BookOpen size={17} />
-              Heilige
-            </a>
-            <a
-              href="#/vorlagen"
-              className={isTemplates ? 'active' : ''}
-              aria-current={isTemplates ? 'page' : undefined}
-            >
-              <FileText size={17} />
-              Vorlagen
-            </a>
-            <a
-              href="#/einstellungen"
-              className={isSettings ? 'active' : ''}
-              aria-current={isSettings ? 'page' : undefined}
-            >
-              Einstellungen
-            </a>
-            <a
-              href="#/verkuendigungen"
-              className={isArchive ? 'active' : ''}
-              aria-current={isArchive ? 'page' : undefined}
-            >
-              Verkündigungen
-            </a>
+            {[
+              {
+                href: '#/',
+                label: 'Übersicht',
+                Icon: House,
+                active:
+                  !isSaints &&
+                  !isTemplates &&
+                  !isDocuments &&
+                  !isSettings &&
+                  !isArchive &&
+                  !isEvents &&
+                  !isServices,
+              },
+              { href: '#/erstellen', label: 'Erstellen', Icon: FilePlus2, active: isDocuments },
+              {
+                href: '#/verkuendigungen',
+                label: 'Verkündigungen',
+                Icon: Files,
+                active: isArchive,
+              },
+              { href: '#/gottesdienste', label: 'Gottesdienste', Icon: Church, active: isServices },
+              { href: '#/termine', label: 'Termine', Icon: CalendarDays, active: isEvents },
+              { href: '#/heilige', label: 'Heilige', Icon: BookOpen, active: isSaints },
+              { href: '#/vorlagen', label: 'Vorlagen', Icon: FileText, active: isTemplates },
+              {
+                href: '#/einstellungen',
+                label: 'Einstellungen',
+                Icon: Settings,
+                active: isSettings,
+              },
+            ].map(({ href, label, Icon, active }) => (
+              <a
+                key={href}
+                href={href}
+                className={active ? 'active' : ''}
+                aria-current={active ? 'page' : undefined}
+              >
+                <Icon size={17} />
+                {label}
+              </a>
+            ))}
           </nav>
         </div>
       </header>
@@ -111,11 +107,19 @@ export default function App() {
               ? 'Default-Einstellungen'
               : isArchive
               ? 'Verkündigungen'
+              : isServices
+              ? 'Gottesdienste'
+              : isEvents
+              ? 'Termine'
               : 'Übersicht'}
           </span>
         </div>
         {isSaints ? (
           <SaintsPage />
+        ) : isServices ? (
+          <ServicesPage />
+        ) : isEvents ? (
+          <EventsPage />
         ) : isArchive ? (
           <DocumentArchivePage />
         ) : isSettings ? (
@@ -152,7 +156,7 @@ export default function App() {
                 <span className="icon-box">
                   <CalendarDays size={22} />
                 </span>
-                <span className="muted-label">ABKÜNDIGUNGEN ERSTELLEN</span>
+                <span className="muted-label">VERKÜNDIGUNGEN ERSTELLEN</span>
                 <h2>Eine Woche. Eine Verkündigung.</h2>
                 <p>
                   Eine liturgische Woche auswählen, Gottesdienste und Intentionen ergänzen und die

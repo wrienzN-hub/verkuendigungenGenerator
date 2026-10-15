@@ -12,11 +12,11 @@ import {
 export default function DocumentDayEditor({
   day,
   onChange,
-  first,
+  servicesOnly = false,
 }: {
   day: DocumentDay;
   onChange: (day: DocumentDay) => void;
-  first: boolean;
+  servicesOnly?: boolean;
 }) {
   const edit = (change: (copy: DocumentDay) => void) => {
     const copy = structuredClone(day);
@@ -24,7 +24,7 @@ export default function DocumentDayEditor({
     onChange(copy);
   };
   return (
-    <details className={`document-day ${day.enabled ? '' : 'day-disabled'}`} open={first}>
+    <details className={`document-day ${day.enabled ? '' : 'day-disabled'}`}>
       <summary>
         <span>
           {new Date(day.date + 'T12:00:00').toLocaleDateString('de-AT', { weekday: 'long' })},{' '}
@@ -36,78 +36,88 @@ export default function DocumentDayEditor({
         </small>
       </summary>
       <div className="document-day-body">
-        <label className="inline-check">
-          <input
-            type="checkbox"
-            checked={day.enabled}
-            onChange={(e) =>
-              edit((d) => {
-                d.enabled = e.target.checked;
-              })
-            }
-          />
-          Diesen Tag ausgeben
-        </label>
-        <h3>Titelzeilen und Heilige</h3>
-        <p className="field-help">
-          Aktive Heilige werden als Titel übernommen. Ergänze darunter zum Beispiel Kirchtag und
-          Erntedank. Jede Zeile wird Deutsch | Slowenisch und vollständig fett ausgegeben.
-        </p>
-        {day.celebrations.map((celebration, index) => (
-          <div className="document-item" key={celebration.id}>
-            <div className="document-item-bar">
-              <label className="inline-check">
-                <input
-                  type="checkbox"
-                  checked={celebration.enabled}
-                  onChange={(e) =>
-                    edit((d) => {
-                      d.celebrations[index].enabled = e.target.checked;
-                    })
-                  }
-                />
-                Titelzeile ausgeben
-              </label>
-              <RemoveButton
-                label="Titelzeile entfernen"
-                onClick={() =>
+        {!servicesOnly && (
+          <>
+            <label className="inline-check">
+              <input
+                type="checkbox"
+                checked={day.enabled}
+                onChange={(e) =>
                   edit((d) => {
-                    d.celebrations.splice(index, 1);
+                    d.enabled = e.target.checked;
                   })
                 }
               />
-            </div>
-            <TextFields
-              label="Titelzeile"
-              value={celebration.title}
-              onChange={(value) =>
+              Diesen Tag ausgeben
+            </label>
+            <h3>Titelzeilen und Heilige</h3>
+            <p className="field-help">
+              Aktive Heilige werden als Titel übernommen. Ergänze darunter zum Beispiel Kirchtag und
+              Erntedank. Jede Zeile wird Deutsch | Slowenisch und vollständig fett ausgegeben.
+            </p>
+            {day.celebrations.map((celebration, index) => (
+              <div className="document-item" key={celebration.id}>
+                <div className="document-item-bar">
+                  <label className="inline-check">
+                    <input
+                      type="checkbox"
+                      checked={celebration.enabled}
+                      onChange={(e) =>
+                        edit((d) => {
+                          d.celebrations[index].enabled = e.target.checked;
+                        })
+                      }
+                    />
+                    Titelzeile ausgeben
+                  </label>
+                  <RemoveButton
+                    label="Titelzeile entfernen"
+                    onClick={() =>
+                      edit((d) => {
+                        d.celebrations.splice(index, 1);
+                      })
+                    }
+                  />
+                </div>
+                <TextFields
+                  label="Titelzeile"
+                  rich
+                  defaultBold
+                  value={celebration.title}
+                  onChange={(value) =>
+                    edit((d) => {
+                      d.celebrations[index].title = value;
+                    })
+                  }
+                />
+              </div>
+            ))}
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() =>
                 edit((d) => {
-                  d.celebrations[index].title = value;
+                  d.celebrations.push({
+                    id: newId(),
+                    enabled: true,
+                    source_celebration_id: null,
+                    title: emptyText(),
+                    rank: null,
+                  });
                 })
               }
-            />
-          </div>
-        ))}
-        <button
-          className="button secondary"
-          type="button"
-          onClick={() =>
-            edit((d) => {
-              d.celebrations.push({
-                id: newId(),
-                enabled: true,
-                source_celebration_id: null,
-                title: emptyText(),
-                rank: null,
-              });
-            })
-          }
-        >
-          + Titelzeile hinzufügen
-        </button>
+            >
+              + Titelzeile hinzufügen
+            </button>
+          </>
+        )}
         <h3>Gottesdienste</h3>
         {day.services.map((service, index) => (
-          <section key={service.id} className="service-editor">
+          <details key={service.id} className="service-editor config-panel">
+            <summary>
+              Gottesdienst {index + 1}
+              {service.time ? ` · ${service.time}` : ''}
+            </summary>
             <div className="document-item-bar">
               <h4>Gottesdienst {index + 1}</h4>
               <RemoveButton
@@ -154,15 +164,6 @@ export default function DocumentDayEditor({
                 })
               }
             />
-            <TextFields
-              label="Gottesdienst"
-              value={service.title}
-              onChange={(value) =>
-                edit((d) => {
-                  d.services[index].title = value;
-                })
-              }
-            />
             <h4>Messintentionen</h4>
             <p className="field-help">
               Gebetsanliegen dieser Messe, z. B. für verstorbene Angehörige. Das Zeichen und eine
@@ -194,6 +195,7 @@ export default function DocumentDayEditor({
                 </div>
                 <TextFields
                   label="Intention"
+                  rich
                   multiline
                   value={intention.text}
                   onChange={(value) =>
@@ -260,7 +262,7 @@ export default function DocumentDayEditor({
                 })
               }
             />
-          </section>
+          </details>
         ))}
         <button
           type="button"
@@ -272,7 +274,7 @@ export default function DocumentDayEditor({
                 enabled: true,
                 time: null,
                 location: emptyText(),
-                title: { de: 'Heilige Messe', sl: 'Sveta maša' },
+                title: emptyText(),
                 intentions: [],
                 notices: [],
               });
@@ -281,8 +283,15 @@ export default function DocumentDayEditor({
         >
           + Gottesdienst hinzufügen
         </button>
-        <h3>Hinweise zum Tag</h3>
-        <NoticeFields notices={day.notices} onChange={(notices) => onChange({ ...day, notices })} />
+        {!servicesOnly && (
+          <>
+            <h3>Hinweise zum Tag</h3>
+            <NoticeFields
+              notices={day.notices}
+              onChange={(notices) => onChange({ ...day, notices })}
+            />
+          </>
+        )}
       </div>
     </details>
   );

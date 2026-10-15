@@ -1,5 +1,11 @@
-export type Bilingual = { de: string; sl: string };
-export type Notice = { id: string; enabled: boolean; text: Bilingual };
+export type TextMark = { start: number; end: number; bold: boolean; underline?: boolean };
+export type Bilingual = { de: string; sl: string; de_marks?: TextMark[]; sl_marks?: TextMark[] };
+export type Notice = {
+  id: string;
+  enabled: boolean;
+  text: Bilingual;
+  source_event_id?: number | null;
+};
 export type Intention = Notice & { symbol: string; reference: string | null };
 export type Celebration = {
   id: string;
@@ -18,6 +24,7 @@ export type Service = {
   notices: Notice[];
 };
 export type DocumentDay = {
+  services_revision?: number;
   id: string;
   date: string;
   enabled: boolean;

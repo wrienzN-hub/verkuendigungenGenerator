@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from ..dependencies import get_database
 from ...schemas.documents import DocumentPayload, PrepareDocument, SaveDocument
+from ...services.dated_services import sync_document_services
 from ...services.documents import generation_weeks, options, prepare, read_document, template_source, validate_selection
 from ...services.document_rendering import ConversionError, additional_lines, bilingual, converter_available, convert_pdf, render_docx
 
@@ -53,6 +54,7 @@ def create_document(body: SaveDocument, conn: Connection):
     if payload.template_version != hashlib.sha256(template['docx']).hexdigest():
         raise HTTPException(409, 'Die Vorlage wurde geändert. Bitte einen neuen Entwurf laden.')
     with conn:
+        sync_document_services(conn, payload)
         cursor = conn.execute('INSERT INTO document_payloads(template_id,template_docx,payload_json) VALUES(?,?,?)', (payload.template_id, template['docx'], payload.model_dump_json(by_alias=True)))
     return read_document(conn, cursor.lastrowid)
 
@@ -75,6 +77,7 @@ def update_document(document_id: int, body: SaveDocument, conn: Connection):
         if body.payload.model_dump(mode='json')[key] != before[key]:
             raise HTTPException(422, 'Für eine andere Vorlage oder Woche bitte einen neuen Entwurf laden.')
     with conn:
+        sync_document_services(conn, body.payload, before)
         cursor = conn.execute("UPDATE document_payloads SET payload_json=?, revision=revision+1, generated_pdf=NULL, generated_docx=NULL, updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id=? AND revision=?", (body.payload.model_dump_json(by_alias=True), document_id, body.revision))
         if cursor.rowcount != 1:
             raise HTTPException(409, 'Der Entwurf wurde inzwischen geändert. Bitte erneut öffnen.')
@@ -86,7 +89,7 @@ def generate(document_id, conn, revision, preview=False):
     if current['revision'] != revision:
         raise HTTPException(409, 'Der Entwurf wurde inzwischen geändert. Bitte erneut öffnen.')
     payload = DocumentPayload.model_validate(current['payload'])
-    visible = any(day.enabled and (any(c.enabled and bilingual(c.title) for c in day.celebrations) or any(s.enabled and (s.time or bilingual(s.title) or bilingual(s.location) or any(i.enabled and bilingual(i.text) for i in s.intentions) or any(n.enabled and bilingual(n.text) for n in s.notices)) for s in day.services) or any(n.enabled and bilingual(n.text) for n in day.notices)) for day in payload.days)
+    visible = any(day.enabled for day in payload.days)
     if not visible and not additional_lines(payload):
         raise HTTPException(422, 'Bitte mindestens einen sichtbaren Gottesdienst, Gedenktag, Hinweis oder Termin ergänzen.')
     template = conn.execute('SELECT template_docx FROM document_payloads WHERE id=?', (document_id,)).fetchone()[0]

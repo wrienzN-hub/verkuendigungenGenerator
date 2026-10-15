@@ -67,7 +67,17 @@ Unterstützt werden PDF-Dateien bis 25 MB mit auswählbarem Text im Gurker Monat
 
 Fehlende Kalendertage verhindern den Import nicht, sofern mindestens 90 % des Kirchenjahres erkannt wurden. Der Importbericht enthält `missing_dates` (ISO-Daten) und `expected_calendar_days`. Die Oberfläche zeigt die Lücken nach dem Upload und dauerhaft bei den vorhandenen Directorien an. Für fehlende Tage entstehen keine erfundenen Feiern oder Quellenabschnitte.
 
-## Pfarrvorgaben
+## Termine und Textformatierung
+
+Die Navigation ist nach Arbeitsablauf angeordnet: Übersicht, Erstellen, Verkündigungen, Termine, Heilige, Vorlagen, Einstellungen. Jeder Eintrag hat ein Icon.
+
+Unter **Termine** (`#/termine`) zeigt eine Tabelle die Inhalte mit internem Namen, Pfarren und Wochenzuordnungen. Neu und Bearbeiten öffnen ein Modal wie bei den Heiligen. Ein Termin hat einen internen Namen, ein formatiertes Inhaltsfeld, mindestens eine Pfarre und beliebig mehrere liturgische Wochen (auch aus mehreren Kirchenjahren). Datum, Uhrzeit und Ort werden nicht separat gepflegt. Beide Sprachen können im gemeinsamen Inhaltsfeld stehen. Ohne Wochenzuordnung bleibt der Termin als Entwurf gespeichert. Beim Vorbereiten einer Verkündigung werden passende Inhalte automatisch in den Abschnitt Termine übernommen; der interne Name wird nicht ausgegeben. Bereits gespeicherte Verkündigungen bleiben unabhängige Momentaufnahmen.
+
+Textfelder für Hinweise, Intentionen, Titel und Ankündigungen unterstützen einzelne fette Wörter: Text markieren und **Fett** oder **Strg+B** drücken. Erneutes Umschalten macht die Auswahl normal. Vorbelegte fette Überschriften erlauben auch normal gesetzte Teilstücke. Texte werden mit validierten Formatierungsbereichen gespeichert, nicht als HTML. Beim ewigen Licht bleibt nur die Beschriftung automatisch fett; Namen sind standardmäßig normal.
+
+Alle acht Tage werden angezeigt und ausgegeben, auch ohne Heilige, Messe oder Text. Nur **Diesen Tag ausgeben** auszuschalten entfernt einen Tag. Bereits erzeugte Word-Dateien müssen für diese Änderung neu erstellt werden.
+
+## Vorgaben pro Pfarre
 
 Unter **Einstellungen** (`#/einstellungen`) werden wiederkehrende Gottesdienste, Kanzleistunden und Kontakte getrennt nach Pfarre gespeichert. Jeder Gottesdienst hat einen Wochentag, eine optionale Uhrzeit, einen Ort und eine zweisprachige Bezeichnung. Mehrere Vorgaben für denselben Wochentag sind möglich. Deaktivierte Vorgaben werden nicht übernommen.
 
@@ -75,11 +85,11 @@ Unter **Einstellungen** (`#/einstellungen`) werden wiederkehrende Gottesdienste,
 
 Unter **Erstellen** (`#/erstellen`) Pfarre, Vorlage und liturgische Woche wählen. **Woche laden** erstellt acht Tage von Sonntag bis zum folgenden Sonntag und übernimmt die aktuellen Pfarrvorgaben, auch für beide Sonntage. Änderungen an Vorgaben verändern gespeicherte Entwürfe nicht.
 
-Die Bearbeitung gliedert sich in **Gottesdienste & Heilige**, **Termine & Kontakt** und **Dokumentvorschau**. Beim Öffnen oder Aktualisieren der Vorschau wird der Entwurf gespeichert. Die Vorschau zeigt die tatsächlich erzeugte Word-Datei nach einer internen Konvertierung, einschließlich Bildern, Tabellen und Seitenumbrüchen. Microsoft Word oder LibreOffice wird nur für diese Vorschau benötigt. Änderungen machen die bisherige Vorschau ungültig.
+Die Bearbeitung gliedert sich in **Gottesdienste & Heilige**, **Termine**, **Kontakte** und **Dokumentvorschau**. Beim Öffnen oder Aktualisieren der Vorschau wird der Entwurf gespeichert. Die Vorschau zeigt die tatsächlich erzeugte Word-Datei nach einer internen Konvertierung, einschließlich Bildern, Tabellen und Seitenumbrüchen. Microsoft Word oder LibreOffice wird nur für diese Vorschau benötigt. Änderungen machen die bisherige Vorschau ungültig.
 
 **Verkündigung erstellen** speichert den aktuellen Stand und erzeugt eine bearbeitbare DOCX-Datei. **Word herunterladen** lädt diese Datei herunter. Dafür wird kein PDF-Konverter benötigt. Nach Änderungen muss die Word-Datei erneut erstellt werden. Die separate Seite **Verkündigungen** (`#/verkuendigungen`) zeigt gespeicherte Entwürfe mit Paging, Öffnen, Word-Download und bestätigtem Löschen. Der Browser speichert den aktuellen Entwurf zusätzlich lokal zwischen; diese Kopie ersetzt das Speichern auf dem Server nicht.
 
-Aktive und verfügbare Heilige werden beim Laden neuer Wochen als sichtbare Titel übernommen, auch wahlweise Gedenktage. Bestehende Entwürfe behalten ihre Auswahl. Unter **Titelzeilen und Heilige** können eigene Zeilen wie Kirchtag und Erntedank ergänzt werden; jede Zeile erscheint als **Deutsch | Slowenisch** vollständig fett. Messintentionen sind Gebetsanliegen mit optionalem Zeichen und Referenz; Hinweise sind normale Zusatzinformationen.
+Aktive und verfügbare Heilige werden beim Laden neuer Wochen als sichtbare Titel übernommen, auch wahlweise Gedenktage. Bestehende Entwürfe behalten ihre Auswahl. Unter **Titelzeilen und Heilige** können eigene Zeilen wie Kirchtag und Erntedank ergänzt werden; jede Zeile erscheint als **Deutsch | Slowenisch**, standardmäßig fett. Einzelne Teile können über die Formatierung normal gesetzt werden. Messintentionen sind Gebetsanliegen mit optionalem Zeichen und Referenz; Hinweise sind zusätzliche Informationen.
 
 Bei der alten Gurker Vorlage mit zwei übereinanderliegenden Vollbreiten-Bannern in einem schwebenden Textfeld wird nur die erzeugte Ausgabe bereinigt. Die Originaldatei bleibt unverändert. Kanzleistunden und Kontakte nutzen die Rahmen und Paragraphen der gewählten Vorlage; Kontakte werden links und rechts angeordnet.
 
@@ -88,3 +98,12 @@ Bei der alten Gurker Vorlage mit zwei übereinanderliegenden Vollbreiten-Bannern
 In der Heiligenverwaltung das Jahr auswählen und danach direkt neben dem Monat die liturgische Woche wählen. Die Zeiten sind als Gruppen in diesem einen Dropdown zusammengefasst. Die Optionen werden aus den datierten Überschriften des importierten Directoriums abgeleitet. Es werden keine ISO-Kalenderwochen verwendet. Der Zeitraum reicht jeweils vom zugehörigen Sonntag bis einschließlich des folgenden Sonntags. Für Weihnachtszeit, Karwoche und den Fastenbeginn werden benannte Zeiträume statt erfundener Wochennummern angeboten.
 
 Bei einer Wochenauswahl wird ein vorheriger Monatsfilter zurückgesetzt, damit Wochen über eine Monatsgrenze vollständig erscheinen. Suche, Rang, Aktivierung und Verfügbarkeit lassen sich weiterhin kombinieren. Der Jahresfilter 2026/27 umfasst den 1. Dezember 2026 bis 30. November 2027. Er filtert nach dem Datum und kann deshalb Einträge aus zwei Directorien enthalten. Wochen werden mit dieser Jahresgrenze geschnitten. Die Monate werden von Dezember bis November angeboten. Lücken im Directorium werden nicht mit erfundenen Daten gefüllt.
+
+
+## Gottesdienste und gemeinsame Sonntage
+
+Unter `#/gottesdienste` werden Gottesdienste und Intentionen pro Pfarre und konkretem Datum gespeichert. Auch beim Speichern einer Verkündigung werden geänderte Gottesdienste dort hinterlegt. Neu vorbereitete Wochen laden diesen Stand, sodass der gemeinsame Sonntag benachbarter Wochen nur einmal gepflegt werden muss. Es erfolgt keine pauschale Wiederholung auf andere Sonntage. Regelmäßige Uhrzeiten stammen weiterhin aus den Einstellungen. Gespeicherte Dokumente bleiben Momentaufnahmen; veraltete Änderungen an einem Gottesdienst werden mit HTTP 409 abgefangen.
+
+Die Erstellung trennt Gottesdienste/Heilige, Termine, Kontakte und Vorschau. Tage, einzelne Gottesdienste und die Konfigurationsbereiche unter Termine, Kontakte und Einstellungen starten eingeklappt. Das zusätzliche Gottesdienst-Textfeld entfällt. Kanzleistunden werden mit eigener Überschrift und normalen Zeiten ausgegeben.
+
+Die Wochenzuordnung im Termin-Modal hat eine Textsuche und einen Filter für die liturgische Zeit. Die Auswahl bleibt auch bei gefilterter Liste erhalten. Formatierte Felder unterstützen Fett und Unterstreichen (Schaltflächen, Strg+B bzw. Strg+U).

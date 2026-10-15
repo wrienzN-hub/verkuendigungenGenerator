@@ -14,6 +14,7 @@ from zipfile import ZipFile
 from lxml import etree as ET
 
 from ..schemas.documents import DocumentPayload
+from .rich_text import bilingual, bold_label, join_text
 
 NS = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
 W = '{' + NS['w'] + '}'
@@ -53,10 +54,6 @@ def template_supported(data):
         return table_slot(root) is not None or marker
 
 
-def bilingual(value):
-    return ' | '.join(part.strip() for part in [value.de, value.sl] if part.strip())
-
-
 def paragraph(prototype, value, *, bold=None):
     result = deepcopy(prototype)
     properties = result.find('w:pPr', NS)
@@ -71,21 +68,29 @@ def paragraph(prototype, value, *, bold=None):
         for tag in ['sectPr', 'pageBreakBefore', 'keepNext']:
             for item in properties.findall('w:' + tag, NS):
                 properties.remove(item)
-    if bold is not None:
-        for tag in ['b', 'bCs']:
-            for item in run_props.findall('w:' + tag, NS):
-                run_props.remove(item)
-            ET.SubElement(run_props, W + tag, {W + 'val': '1' if bold else '0'})
-    run = ET.SubElement(result, W + 'r')
-    run.append(run_props)
-    for index, line in enumerate(value.split('\n')):
-        if index:
-            ET.SubElement(run, W + 'br')
-        for column, part in enumerate(line.split('\t')):
-            if column:
-                ET.SubElement(run, W + 'tab')
-            node = ET.SubElement(run, W + 't', {'{http://www.w3.org/XML/1998/namespace}space': 'preserve'})
-            node.text = part
+    marks = getattr(value, 'marks', [])
+    boundaries = sorted({0, len(value), *(point for start, end, _, _ in marks for point in [start, end])})
+    for start, end in zip(boundaries, boundaries[1:]):
+        effective = next((weight for left, right, weight, _ in marks if left <= start and end <= right), bold)
+        properties_copy = deepcopy(run_props)
+        if effective is not None:
+            for tag in ['b', 'bCs']:
+                for item in properties_copy.findall('w:' + tag, NS):
+                    properties_copy.remove(item)
+                ET.SubElement(properties_copy, W + tag, {W + 'val': '1' if effective else '0'})
+        underline = next((under for left, right, _, under in marks if left <= start and end <= right), False)
+        for item in properties_copy.findall('w:u', NS):
+            properties_copy.remove(item)
+        ET.SubElement(properties_copy, W + 'u', {W + 'val': 'single' if underline else 'none'})
+        run = ET.SubElement(result, W + 'r'); run.append(properties_copy)
+        for index, line in enumerate(value[start:end].split('\n')):
+            if index: ET.SubElement(run, W + 'br')
+            for column, part in enumerate(line.split('\t')):
+                if column: ET.SubElement(run, W + 'tab')
+                node = ET.SubElement(run, W + 't', {'{http://www.w3.org/XML/1998/namespace}space': 'preserve'})
+                node.text = part
+    if not len(value):
+        ET.SubElement(ET.SubElement(result, W + 'r'), W + 't').text = ''
     return result
 
 
@@ -118,8 +123,6 @@ def day_rows(table, payload):
         celebrations = [(bilingual(item.title), True) for item in day.celebrations if item.enabled and bilingual(item.title)]
         notices = notice_lines(day.notices)
         services = [service for service in day.services if service.enabled]
-        if not celebrations and not notices and not services:
-            continue
         for index, service in enumerate(services or [None]):
             row = deepcopy(prototype)
             for height in row.findall('w:trPr/w:trHeight', NS):
@@ -133,11 +136,9 @@ def day_rows(table, payload):
             fill_cell(cells[2], [(bilingual(service.location), False)] if service else [])
             lines = celebrations + notices if index == 0 else []
             if service:
-                if bilingual(service.title):
-                    lines.append((bilingual(service.title), False))
                 for intention in service.intentions:
                     if intention.enabled and bilingual(intention.text):
-                        value = ' '.join(part for part in [intention.symbol, bilingual(intention.text), intention.reference] if part)
+                        value = join_text([part for part in [intention.symbol, bilingual(intention.text), intention.reference] if part], ' ')
                         lines.append((value, False))
                 lines.extend(notice_lines(service.notices))
             fill_cell(cells[3], lines)
@@ -165,8 +166,10 @@ def contact_lines(payload):
 def office_lines(hours):
     groups = {}
     for item in hours:
-        groups.setdefault((item.from_, item.until), []).append(OFFICE_DAYS[item.weekday])
-    return [' & '.join(days) + f': {start}–{end}' for (start, end), days in groups.items()]
+        days = groups.setdefault((item.from_, item.until), [])
+        if OFFICE_DAYS[item.weekday] not in days:
+            days.append(OFFICE_DAYS[item.weekday])
+    return [' & '.join(days) + f': {start}–{end} Uhr' for (start, end), days in groups.items()]
 
 
 def contact_paragraph(prototype, value, body):
@@ -189,7 +192,7 @@ def contact_paragraph(prototype, value, body):
 def additional_lines(payload):
     lines = announcement_lines(payload)
     if payload.eternal_light.enabled and bilingual(payload.eternal_light.dedication):
-        lines.append(('Das ewige Licht brennt für | Večna luč gori za: ' + bilingual(payload.eternal_light.dedication), False))
+        lines.append((bold_label('Das ewige Licht brennt für | Večna luč gori za:', bilingual(payload.eternal_light.dedication)), False))
     if payload.office_hours:
         lines.append(('Kanzleistunden | Uradne ure', True))
         lines.extend((value, False) for value in office_lines(payload.office_hours))
@@ -275,21 +278,17 @@ def render_docx(source: bytes, payload: DocumentPayload):
                     append(paragraph(prototype, value, bold=bold))
             else:
                 announcements = announcement_lines(payload)
-                if announcements:
-                    if heading is not None:
-                        append(paragraph(heading, 'Termine | Termini'))
-                    for value, bold in announcements:
-                        append(paragraph(prototype, value, bold=bold))
+                if (announcements or (payload.eternal_light.enabled and bilingual(payload.eternal_light.dedication))) and heading is not None:
+                    append(paragraph(heading, 'Termine | Termini'))
                 # Retain the template's bordered eternal-light/office-hours box.
                 footer_rows = footer.findall('w:tr', NS)
                 for index, row in enumerate(footer_rows):
                     values = []
                     label = plain(row).casefold()
                     if 'ewige licht' in label and payload.eternal_light.enabled and bilingual(payload.eternal_light.dedication):
-                        values = [('Das ewige Licht brennt für | Večna luč gori za: ' + bilingual(payload.eternal_light.dedication), True)]
+                        values = [(bold_label('Das ewige Licht brennt für | Večna luč gori za:', bilingual(payload.eternal_light.dedication)), False)]
                     elif 'kanzlei' in label and payload.office_hours:
-                        hours = '; '.join(office_lines(payload.office_hours))
-                        values = [('Kanzleistunden | Uradne ure: ' + hours, True)]
+                        values = [('Kanzleistunden | Uradne ure', True)] + [(hours, False) for hours in office_lines(payload.office_hours)]
                     if not values:
                         footer.remove(row)
                         continue
@@ -297,8 +296,41 @@ def render_docx(source: bytes, payload: DocumentPayload):
                         height.getparent().remove(height)
                     cells = row.findall('w:tc', NS)
                     fill_cell(cells[0], values)
+                    if 'kanzlei' in label:
+                        for p in cells[0].findall('w:p', NS):
+                            props = p.find('w:pPr', NS)
+                            if props is None:
+                                props = ET.Element(W + 'pPr'); p.insert(0, props)
+                            for node in props.findall('w:jc', NS) + props.findall('w:spacing', NS):
+                                props.remove(node)
+                            ET.SubElement(props, W + 'jc', {W + 'val': 'left'})
+                            ET.SubElement(props, W + 'spacing', {W + 'before': '0', W + 'after': '40'})
                     for cell in cells[1:]:
                         fill_cell(cell, [])
+                # One framed row per free-form announcement, between the light
+                # dedication and office hours, using the source table's geometry.
+                announcement_prototype = deepcopy(footer_rows[0])
+                office_row = next((row for row in footer.findall('w:tr', NS) if 'Kanzleistunden' in plain(row)), None)
+                for announcement in payload.announcements:
+                    if not announcement.enabled:
+                        continue
+                    lines = []
+                    if bilingual(announcement.title):
+                        lines.append((bilingual(announcement.title), True))
+                    lines.extend((bilingual(part), False) for part in announcement.paragraphs if bilingual(part))
+                    if not lines:
+                        continue
+                    row = deepcopy(announcement_prototype)
+                    for child in row.findall('w:trPr/w:trHeight', NS) + row.findall('w:trPr/w:cantSplit', NS):
+                        child.getparent().remove(child)
+                    cells = row.findall('w:tc', NS)
+                    fill_cell(cells[0], lines)
+                    for cell in cells[1:]:
+                        fill_cell(cell, [])
+                    if office_row is not None:
+                        office_row.addprevious(row)
+                    else:
+                        footer.append(row)
                 if footer.findall('w:tr', NS):
                     append(paragraph(prototype, ''))
                     append(footer)
@@ -322,12 +354,11 @@ def render_docx(source: bytes, payload: DocumentPayload):
                 content = [(bilingual(c.title), True) for c in day.celebrations if c.enabled and bilingual(c.title)] + notice_lines(day.notices)
                 for service in day.services:
                     if service.enabled:
-                        content.append((' · '.join(p for p in [service.time, bilingual(service.location), bilingual(service.title)] if p), False))
-                        content.extend((' '.join(p for p in [i.symbol, bilingual(i.text), i.reference] if p), False) for i in service.intentions if i.enabled and bilingual(i.text))
+                        content.append((' · '.join(p for p in [service.time, bilingual(service.location)] if p), False))
+                        content.extend((join_text([p for p in [i.symbol, bilingual(i.text), i.reference] if p], ' '), False) for i in service.intentions if i.enabled and bilingual(i.text))
                         content.extend(notice_lines(service.notices))
-                if content:
-                    lines.append((f'{DAYS[day.date.weekday()]} {day.date:%d.%m.%Y}', True))
-                    lines.extend(content)
+                lines.append((f'{DAYS[day.date.weekday()]} {day.date:%d.%m.%Y}', True))
+                lines.extend(content)
             for value, bold in lines + extra:
                 marker.addprevious(paragraph(marker, value, bold=bold))
             body.remove(marker)

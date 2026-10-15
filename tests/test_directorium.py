@@ -90,7 +90,7 @@ class DirectoriumImportTests(unittest.TestCase):
 
     def test_migrations_can_be_repeated(self):
         migrate(self.conn)
-        self.assertEqual(self.conn.execute('PRAGMA user_version').fetchone()[0], 5)
+        self.assertEqual(self.conn.execute('PRAGMA user_version').fetchone()[0], 8)
 
     def test_older_edition_rank_without_named_commemoration(self):
         block={'date':'2026-02-07','weekday':'Sa','title':'der 4. Woche im Jahreskreis','context':'','lines':[(81,'der 4. Woche im Jahreskreis'),(81,'g Off vom Tag oder vom g')]}

@@ -133,8 +133,8 @@ export default function SettingsPage() {
         <p role="status">Einstellungen werden geladen …</p>
       ) : (
         <fieldset className="creator-fieldset" disabled={busy || loadedFor !== parish}>
-          <section className="list-panel document-section">
-            <h2>Regelmäßige Gottesdienste</h2>
+          <details className="list-panel document-section config-panel">
+            <summary>Regelmäßige Gottesdienste</summary>
             {settings.services.map((service, index) => (
               <section className="service-editor" key={service.id}>
                 <div className="document-item-bar">
@@ -191,15 +191,6 @@ export default function SettingsPage() {
                   </label>
                 </div>
                 <TextFields
-                  label="Gottesdienst"
-                  value={service.title}
-                  onChange={(value) =>
-                    edit((s) => {
-                      s.services[index].title = value;
-                    })
-                  }
-                />
-                <TextFields
                   label="Ort"
                   value={service.location}
                   onChange={(value) =>
@@ -220,7 +211,7 @@ export default function SettingsPage() {
                     weekday: 6,
                     enabled: true,
                     time: '09:15',
-                    title: { de: 'Heilige Messe', sl: 'Sveta maša' },
+                    title: emptyText(),
                     location: emptyText(),
                     intentions: [],
                     notices: [],
@@ -230,9 +221,9 @@ export default function SettingsPage() {
             >
               + Gottesdienst-Vorgabe hinzufügen
             </button>
-          </section>
-          <section className="list-panel document-section">
-            <h2>Kanzleistunden</h2>
+          </details>
+          <details className="list-panel document-section config-panel">
+            <summary>Kanzleistunden</summary>
             {settings.office_hours.map((hours, index) => (
               <div className="office-row" key={index}>
                 <label>
@@ -305,9 +296,9 @@ export default function SettingsPage() {
             >
               + Kanzleistunde hinzufügen
             </button>
-          </section>
-          <section className="list-panel document-section">
-            <h2>Kontakt</h2>
+          </details>
+          <details className="list-panel document-section config-panel">
+            <summary>Kontakt</summary>
             {settings.contact.persons.map((person, index) => (
               <div className="contact-person" key={index}>
                 <label>
@@ -381,7 +372,7 @@ export default function SettingsPage() {
                 />
               </label>
             </div>
-          </section>
+          </details>
           <button
             type="button"
             className="button primary"

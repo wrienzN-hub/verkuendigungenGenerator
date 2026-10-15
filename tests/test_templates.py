@@ -32,7 +32,8 @@ class TemplateTests(unittest.TestCase):
         return self.client.post('/api/v1/templates', data={'parish_name': parish, 'name': name}, files={'file': (filename, word_file() if data is None else data)})
 
     def test_multiple_parishes_variants_and_original_download(self):
-        result = self.upload(filename='../Verkündigung.docx')
+        original = word_file()
+        result = self.upload(filename='../Verkündigung.docx', data=original)
         self.assertEqual(result.status_code, 201, result.text)
         template = result.json()
         self.assertEqual(template['source_filename'], 'Verkündigung.docx')
@@ -42,7 +43,7 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(self.upload(' eberndorf ', ' standard ').status_code, 409)
         self.assertEqual(len(self.client.get('/api/v1/templates').json()), 3)
         source = self.client.get(f"/api/v1/templates/{template['id']}/source")
-        self.assertEqual(source.content, word_file())
+        self.assertEqual(source.content, original)
         self.assertIn('attachment;', source.headers['content-disposition'])
         with TestClient(create_app(self.path)) as reopened:
             self.assertEqual(len(reopened.get('/api/v1/templates').json()), 3)

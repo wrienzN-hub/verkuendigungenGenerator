@@ -53,6 +53,12 @@ Das JSON enthält eine vollständige Momentaufnahme einschließlich Texten und K
 
 Datumsformat und Wochentagsnamen entstehen aus dem ISO-Datum. Schrift, Tabellenbreiten, feste Beschriftungen und die Anordnung der Sprachen bleiben in der Word-Vorlage. Leere Texte und deaktivierte Einträge werden nicht gedruckt. Eine fehlende Uhrzeit wird als leere Zelle dargestellt; ein Gottesdienst muss keine Uhrzeit haben, solange er noch im Entwurf ist.
 
-Vor der Dokumentausgabe werden Datumsbereich, eindeutige IDs, gültige Uhrzeiten und mindestens ein sichtbarer Inhalt geprüft. Die Dokumenterzeugung muss Tabellen mit mehreren Intentionen und langen Terminen über Seitengrenzen hinweg sauber darstellen. Das ausgefüllte Beispiel zeigt zudem, dass Tage ohne relevante Inhalte ausgelassen werden können; eine automatische Ausblendung solcher Tage ist zusätzlich zu den manuellen Schaltern sinnvoll.
+Vor der Dokumentausgabe werden Datumsbereich, eindeutige IDs, gültige Uhrzeiten und mindestens ein sichtbarer Tag oder weiterer Inhalt geprüft. Jeder aktivierte Tag wird ausgegeben, auch wenn er leer ist. Ausschließlich `enabled: false` entfernt den jeweiligen Tag. Lange Tabellen und Termine dürfen über mehrere Seiten laufen.
+
+## Teilweise fette Texte und verwaltete Termine
+
+Zweisprachige Textobjekte akzeptieren zusätzlich `de_marks` und `sl_marks`: geordnete, nicht überlappende Bereiche `{start,end,bold,underline?}`. Die Positionen zählen Unicode-Codepoints und verwenden eine exklusive Endposition. `underline: true` unterstreicht den Bereich zusätzlich; standardmäßig ist es false. Fehlende Bereiche übernehmen die Grundformatierung des Feldes. `bold: false` kann deshalb ein Wort innerhalb einer fetten Überschrift normal setzen. Beispiel: `{"de":"Bitte Anmeldung","de_marks":[{"start":6,"end":15,"bold":true}]}`. Es wird kein HTML gespeichert oder im Word-Dokument interpretiert; Textabschnitte werden als eigene Word-Runs ausgegeben.
+
+Verwaltete Termine liegen getrennt in `events` mit internem Namen, mehreren Pfarren, formatiertem Inhalt und mehreren liturgischen Wochen. Beim Vorbereiten einer Verkündigung werden passende Inhalte als unabhängige Kopien in `announcements` übernommen. Der interne Name wird nicht ausgegeben. Änderungen oder Löschungen an Terminen verändern bereits gespeicherte Dokumente nicht.
 
 Dieser Ablauf konkretisiert die bisherige README: Das Ausgabeziel ist PDF, und die Auswahl erfolgt über die liturgische Woche. Der Directorium-Import und die Verwaltung der Heiligen bleiben die Grundlage dafür.

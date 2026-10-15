@@ -121,16 +121,21 @@ Die React-Seite `#/vorlagen` bietet Upload, Pfarrfilter und Download. Unter `#/e
 - `POST /api/v1/documents/{id}/preview?revision=1`: rendert dieselbe DOCX-Datei mit Word/LibreOffice für eine layoutgetreue Vorschau. Liefert `preview_url`. Konvertierungsfehler liefern HTTP 503; Word-Ausgabe bleibt unabhängig möglich. Änderungen während der Konvertierung verhindern die Zuordnung einer veralteten Vorschau (HTTP 409).
 - `GET /api/v1/documents/{id}/preview?revision=1`: interne Vorschau als inline dargestelltes PDF mit `Cache-Control: no-store`. Eine veraltete Revision liefert HTTP 409. Es gibt keinen PDF-Download in der Oberfläche.
 
-## Pfarrvorgaben
+## Termine
 
-`GET /api/v1/settings?parish=Eberndorf` liefert `{services,office_hours,contact}`. Für Pfarren ohne Vorgaben werden leere Listen und Kontakte geliefert. `PUT` auf denselben Endpunkt speichert diese Struktur transaktional. `services` entspricht dem Service-Modell des Dokument-Payloads, ergänzt um `weekday` (0 = Montag bis 6 = Sonntag). `enabled: false` deaktiviert eine Regel. Uhrzeiten und Kanzleistunden werden wie im Dokument validiert. Regeln gelten nur für neu geladene Wochen; neue IDs je Tag verhindern Konflikte bei beiden Sonntagen.
+- `GET /api/v1/events?parish=Eberndorf&search=Firm&year=2026/27&week_id=advent:2026-11-29&limit=20&offset=0`: `{items,total}`. Filter optional; Jahr und Wochen-ID gemeinsam verwenden.
+- `POST /api/v1/events`: `{name,parishes,weeks,text}`. Name ist nur intern; `parishes` enthält mindestens eine Pfarre. `weeks` enthält `{year,week_id}`; eine leere Liste speichert einen Entwurf. Text ist ein Bilingual-Objekt mit optionalen Formatierungsbereichen. Die Oberfläche verwendet ein gemeinsames Feld (`de`) für beide Sprachen. Antwort HTTP 201 mit ID, Revision und Zeitstempeln.
+- `GET /api/v1/events/{id}` liest einen Termin.
+- `PUT /api/v1/events/{id}` erwartet die vollständigen Felder und `revision`.
+- `DELETE /api/v1/events/{id}?revision=N` löscht einen Termin.
 
-Die vollständigen validierten Payload-Modelle sind unter `/docs` und in `schemas/documents.py` dokumentiert. Ungültige Zeitangaben, doppelte IDs, abweichende Tage oder Wochenauswahlen liefern HTTP 422. Word-Makros und automatische Link-/Feldupdates sind bei der Konvertierung deaktiviert.
+Nicht vorhandene oder doppelte Wochenzuordnungen liefern HTTP 422, veraltete Revisionen HTTP 409. Es gibt keine Datums-, Uhrzeit- oder Ortsfelder. Bei `/documents/prepare` werden die Inhalte für die ausgewählte Woche und Pfarre als freie Absätze in `announcements` kopiert. Der interne Name bleibt außerhalb des Dokuments. Gespeicherte Verkündigungen werden durch spätere Terminänderungen nicht verändert.
 
-## Liturgische Wochen
 
-`GET /api/v1/saints/weeks?year=2026%2F27` liefert die im Directorium erkennbaren Wochen mit `id`, `season`, `season_label`, `week`, `label`, `start` und `end`. Für benannte Zeiträume ohne Wochennummer ist `week` null. Fehlende Kirchenjahre liefern eine leere Liste.
+## Gottesdienste pro Datum
 
-`GET /api/v1/saints/page?year=2026%2F27&liturgical_week=advent%3A2026-11-29` wählt die erste Adventswoche (29. November bis 6. Dezember) und schneidet sie mit dem Jahresfilter; das Ergebnis beginnt daher frühestens am 1. Dezember. Die Woche muss zum angegebenen Kirchenjahr gehören; ungültige Kombinationen liefern HTTP 422. Ein zusätzlicher Datumsbereich wird mit dem Wochenzeitraum geschnitten. Andere Filter und Paging bleiben kombinierbar.
+`GET /api/v1/services/2026-12-06?parish=Eberndorf` liefert `{services,revision}`. Revision 0 bedeutet, dass für dieses Datum noch keine eigene Konfiguration vorhanden ist. `PUT` auf denselben Endpunkt erwartet diese beiden Felder. Eine leere Liste entfernt die Gottesdienste für diesen Tag ausdrücklich. Änderungen benötigen die aktuelle Revision; andernfalls HTTP 409. Bereits gespeicherte Verkündigungen bleiben unverändert.
 
-Für `/saints/page` und `/saints/weeks` bezeichnet `year=2026/27` den Zeitraum 01.12.2026–30.11.2027. Die Auswahl basiert auf Datumsgrenzen über alle importierten Directorien hinweg; die Quellenzuordnung `liturgical_year` der Datensätze bleibt erhalten. Der ältere Listenendpunkt `/saints` behält seinen Filter auf das Quellenkirchenjahr bei.
+`documents/prepare` verwendet diese Gottesdienste vor den wiederkehrenden Vorgaben. Jeder Tag enthält `services_revision`. Beim Speichern einer Verkündigung werden Änderungen an den Gottesdiensten transaktional in diese Verwaltung übernommen. Eine spätere Woche übernimmt deshalb den gemeinsamen Sonntag. Das historische Feld `Service.title` wird nur für Kompatibilität angenommen und geleert; im Dokument wird es nicht ausgegeben.
+
+Textformatierungen unterstützen zusätzlich `underline: true` (standardmäßig false). Fett und Unterstreichen können im selben Bereich kombiniert werden. Die Bereiche bleiben geordnet und überlappen sich nicht.

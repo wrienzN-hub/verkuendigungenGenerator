@@ -1,5 +1,6 @@
 import { Trash2 } from 'lucide-react';
 import type { Bilingual, Notice } from './documentTypes';
+import RichInput from './RichInput';
 
 export const emptyText = (): Bilingual => ({ de: '', sl: '' });
 export const newId = () => crypto.randomUUID();
@@ -17,33 +18,55 @@ export function TextFields({
   value,
   onChange,
   multiline = false,
+  rich = false,
+  defaultBold = false,
 }: {
   label: string;
   value: Bilingual;
   onChange: (value: Bilingual) => void;
   multiline?: boolean;
+  rich?: boolean;
+  defaultBold?: boolean;
 }) {
   return (
     <div className="bilingual-fields">
-      {(['de', 'sl'] as const).map((language) => (
-        <label key={language}>
-          {label} · {language === 'de' ? 'Deutsch' : 'Slowenisch'}
-          {multiline ? (
-            <textarea
-              rows={3}
-              maxLength={10000}
-              value={value[language]}
-              onChange={(e) => onChange({ ...value, [language]: e.target.value })}
-            />
-          ) : (
-            <input
-              maxLength={10000}
-              value={value[language]}
-              onChange={(e) => onChange({ ...value, [language]: e.target.value })}
-            />
-          )}
-        </label>
-      ))}
+      {(['de', 'sl'] as const).map((language) =>
+        rich ? (
+          <RichInput
+            key={language}
+            label={`${label} · ${language === 'de' ? 'Deutsch' : 'Slowenisch'}`}
+            value={value[language]}
+            marks={value[`${language}_marks`]}
+            defaultBold={defaultBold}
+            multiline={multiline}
+            onChange={(text, marks) =>
+              onChange({ ...value, [language]: text, [`${language}_marks`]: marks })
+            }
+          />
+        ) : (
+          <label key={language}>
+            {label} · {language === 'de' ? 'Deutsch' : 'Slowenisch'}
+            {multiline ? (
+              <textarea
+                rows={3}
+                maxLength={10000}
+                value={value[language]}
+                onChange={(e) =>
+                  onChange({ ...value, [language]: e.target.value, [`${language}_marks`]: [] })
+                }
+              />
+            ) : (
+              <input
+                maxLength={10000}
+                value={value[language]}
+                onChange={(e) =>
+                  onChange({ ...value, [language]: e.target.value, [`${language}_marks`]: [] })
+                }
+              />
+            )}
+          </label>
+        ),
+      )}
     </div>
   );
 }
@@ -95,6 +118,7 @@ export function NoticeFields({
           </div>
           <TextFields
             label={label}
+            rich
             multiline
             value={notice.text}
             onChange={(text) => onChange(notices.map((n, i) => (i === index ? { ...n, text } : n)))}

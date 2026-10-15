@@ -69,14 +69,14 @@ class DocumentTests(unittest.TestCase):
     def test_save_reopen_snapshot_revision_and_word_invalidation(self):
         saved = self.save()
         id_ = saved['id']
-        self.assertEqual(self.client.get(f'/api/v1/documents/{id_}').json()['payload'], self.payload)
+        self.assertEqual(self.client.get(f'/api/v1/documents/{id_}').json()['payload'], saved['payload'])
         with patch('verkuendigungen.api.routes.documents.convert_pdf', return_value=b'%PDF-test'):
             self.assertEqual(self.client.post(f'/api/v1/documents/{id_}/preview?revision=1').status_code, 200)
         self.assertEqual(self.client.get(f'/api/v1/documents/{id_}/preview?revision=1').content, b'%PDF-test')
         word = self.client.get(f'/api/v1/documents/{id_}/docx')
         with ZipFile(BytesIO(word.content)) as archive:
             self.assertIn('word/document.xml', archive.namelist())
-        payload = deepcopy(self.payload)
+        payload = deepcopy(saved['payload'])
         payload['days'][0]['celebrations'][0]['title']['de'] = 'Manuell geändert'
         updated = self.client.put(f'/api/v1/documents/{id_}', json={'payload': payload, 'revision': 1})
         self.assertEqual(updated.status_code, 200, updated.text)
@@ -143,7 +143,7 @@ class DocumentTests(unittest.TestCase):
         self.assertEqual(payload['contact']['email'], 'pfarre@example.org')
         saved = self.save(payload)
         self.client.put('/api/v1/settings?parish=Eberndorf', json={'services': []})
-        self.assertEqual(self.client.get(f"/api/v1/documents/{saved['id']}").json()['payload'], payload)
+        self.assertEqual(self.client.get(f"/api/v1/documents/{saved['id']}").json()['payload'], saved['payload'])
 
     def test_invalid_default_times_and_weekdays_do_not_overwrite_settings(self):
         for rule in [{'id': 'rule', 'weekday': 7}, {'id': 'rule', 'weekday': 0, 'time': '25:00'}, {'id': 'rule', 'weekday': 0, 'enabled': 'yes'}]:
@@ -163,6 +163,131 @@ class DocumentTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/v1/documents').json()['total'], 0)
         self.assertTrue(self.client.get('/api/v1/documents/options').json()['templates'])
 
+    def test_rich_word_runs_and_normal_eternal_light_names(self):
+        payload = deepcopy(self.payload)
+        text = '🙏 Bitte Anmeldung bis Freitag'
+        start = text.index('Anmeldung')
+        payload['days'][0]['notices'] = [{'id': 'rich-notice', 'enabled': True, 'text': {'de': text, 'sl': '', 'de_marks': [{'start': start, 'end': start + len('Anmeldung'), 'bold': True}]}}]
+        payload['eternal_light']['dedication'] = {'de': 'Sowak Edi und Angehörige', 'sl': ''}
+        payload['announcements'] = [{'id': 'rich-announcement', 'enabled': True, 'title': {'de': 'Anmeldung zur Firmung', 'sl': ''}, 'paragraphs': [{'de': 'Informationen auf www.example.org', 'de_marks': [{'start': 17, 'end': 32, 'bold': True}]}]}]
+        parsed = DocumentPayload.model_validate(payload)
+        data = render_docx(Path('resources/vorlage.docx').read_bytes(), parsed)
+        ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+        with ZipFile(BytesIO(data)) as archive:
+            root = ET.fromstring(archive.read('word/document.xml'))
+            runs = [(''.join(run.xpath('.//w:t/text()', namespaces=ns)), run.find('w:rPr/w:b', ns)) for run in root.findall('.//w:r', ns)]
+            selected = next(weight for text, weight in runs if text == 'Anmeldung')
+            self.assertEqual(selected.get('{'+ns['w']+'}val'), '1')
+            names = next(weight for text, weight in runs if 'Sowak Edi' in text)
+            self.assertEqual(names.get('{'+ns['w']+'}val'), '0')
+            label = next(weight for text, weight in runs if text.startswith('Das ewige Licht'))
+            self.assertEqual(label.get('{'+ns['w']+'}val'), '1')
+        saved = self.save(parsed.model_dump(mode='json', by_alias=True))
+        self.assertEqual(saved['payload']['days'][0]['notices'][0]['text']['de_marks'][0]['start'], start)
+
+    def test_shared_sunday_services_and_conflicts(self):
+        payload = deepcopy(self.payload)
+        payload['days'][7]['services'] = [{'id': 'shared-service', 'time': '09:15', 'title': {'de': 'Heilige Messe'}, 'intentions': [{'id': 'shared-intention', 'text': {'de': 'Fuer die Familie'}}]}]
+        saved = self.save(payload)
+        next_payload = self.client.post('/api/v1/documents/prepare', json={'template_id': 0, 'year': '2026/27', 'week_id': 'advent:2026-12-06'}).json()['payload']
+        self.assertEqual(next_payload['days'][0]['services'], saved['payload']['days'][7]['services'])
+        self.assertEqual(next_payload['days'][0]['services'][0]['title']['de'], '')
+        self.assertEqual(next_payload['days'][7]['services'], [])
+        read = self.client.get('/api/v1/services/2026-12-06?parish=Eberndorf').json()
+        edited = deepcopy(read)
+        edited['services'][0]['intentions'][0]['text']['de'] = 'Geaendert'
+        updated = self.client.put('/api/v1/services/2026-12-06?parish=Eberndorf', json=edited)
+        self.assertEqual(updated.status_code, 200, updated.text)
+        self.assertEqual(self.client.put('/api/v1/services/2026-12-06?parish=Eberndorf', json=read).status_code, 409)
+        stale = deepcopy(next_payload)
+        stale['days'][0]['services'][0]['time'] = '10:00'
+        self.assertEqual(self.client.post('/api/v1/documents', json={'payload': stale}).status_code, 409)
+        self.assertEqual(self.client.get('/api/v1/services/2026-12-06?parish=Edling').json()['services'], [])
+        snapshot = self.client.get(f"/api/v1/documents/{saved['id']}").json()['payload']
+        self.assertEqual(snapshot['days'][7]['services'][0]['intentions'][0]['text']['de'], 'Fuer die Familie')
+        unchanged = self.client.put(f"/api/v1/documents/{saved['id']}", json={'payload': snapshot, 'revision': saved['revision']})
+        self.assertEqual(unchanged.status_code, 200, unchanged.text)
+        self.assertEqual(self.client.get('/api/v1/services/2026-12-06?parish=Eberndorf').json()['services'][0]['intentions'][0]['text']['de'], 'Geaendert')
+        self.client.put('/api/v1/settings?parish=Eberndorf', json={'services': [{'id': 'weekly', 'weekday': 6, 'time': '09:15'}]})
+        removed = self.client.put('/api/v1/services/2026-12-06?parish=Eberndorf', json={'services': [], 'revision': updated.json()['revision']})
+        self.assertEqual(removed.status_code, 200)
+        next_payload = self.client.post('/api/v1/documents/prepare', json={'template_id': 0, 'year': '2026/27', 'week_id': 'advent:2026-12-06'}).json()['payload']
+        self.assertEqual(next_payload['days'][0]['services'], [])
+
+    def test_underline_and_office_hours_word_output(self):
+        payload = deepcopy(self.payload)
+        payload['announcements'] = [{'id': 'underlined', 'paragraphs': [{'de': 'Anmeldung normal', 'de_marks': [{'start': 0, 'end': 9, 'bold': True, 'underline': True}]}]}]
+        payload['office_hours'] = [{'weekday': 'tuesday', 'from': '09:00', 'until': '12:00'}, {'weekday': 'thursday', 'from': '10:00', 'until': '12:00'}]
+        payload['days'][0]['services'] = [{'id': 'old-title', 'title': {'de': 'DO NOT PRINT', 'sl': 'NO TITLE'}}]
+        data = render_docx(Path('resources/vorlage.docx').read_bytes(), DocumentPayload.model_validate(payload))
+        with ZipFile(BytesIO(data)) as archive:
+            root = ET.fromstring(archive.read('word/document.xml'))
+        ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+        run = next(r for r in root.findall('.//w:r', ns) if ''.join(r.itertext()) == 'Anmeldung')
+        self.assertEqual(run.find('w:rPr/w:u', ns).get('{'+ns['w']+'}val'), 'single')
+        self.assertEqual(run.find('w:rPr/w:b', ns).get('{'+ns['w']+'}val'), '1')
+        text = ''.join(root.itertext())
+        self.assertNotIn('DO NOT PRINT', text)
+        self.assertNotIn('NO TITLE', text)
+        self.assertIn('09:00', text)
+        for p in root.findall('.//w:p', ns):
+            if '09:00' in ''.join(p.itertext()):
+                self.assertNotIn('Kanzleistunden', ''.join(p.itertext()))
+
+    def test_invalid_rich_text_ranges_are_rejected(self):
+        for marks in [[{'start': 0, 'end': 99, 'bold': True}], [{'start': 2, 'end': 1, 'bold': True}], [{'start': 0, 'end': 3, 'bold': True}, {'start': 2, 'end': 4, 'bold': False}]]:
+            payload = deepcopy(self.payload)
+            payload['days'][0]['notices'] = [{'id': 'invalid', 'text': {'de': 'Text', 'de_marks': marks}}]
+            self.assertEqual(self.client.post('/api/v1/documents', json={'payload': payload}).status_code, 422)
+
+    def test_events_crud_week_filter_paging_and_snapshot(self):
+        week = {'year': '2026/27', 'week_id': 'advent:2026-11-29'}
+        second = {'year': '2026/27', 'week_id': 'advent:2026-12-06'}
+        body = {'name': 'Firmvorbereitungen intern', 'parishes': ['Eberndorf', 'Edling'], 'weeks': [week, second], 'text': {'de': 'Alle sind eingeladen', 'de_marks': [{'start': 0, 'end': 4, 'bold': True}]}}
+        created = self.client.post('/api/v1/events', json=body)
+        self.assertEqual(created.status_code, 201, created.text)
+        event = created.json(); id_ = event['id']
+        self.client.post('/api/v1/events', json={**body, 'name': 'Entwurf', 'weeks': []})
+        self.client.post('/api/v1/events', json={**body, 'name': 'Nur Edling', 'parishes': ['Edling']})
+        matching = self.client.get('/api/v1/events?parish=Edling&year=2026/27&week_id=advent:2026-11-29&limit=1&offset=1').json()
+        self.assertEqual(matching['total'], 2)
+        self.assertEqual(len(matching['items']), 1)
+        self.assertEqual(self.client.get('/api/v1/events?search=FIRM').json()['total'], 1)
+        for selected in [week, second]:
+            prepared = self.client.post('/api/v1/documents/prepare', json={'template_id': 0, 'year': selected['year'], 'week_id': selected['week_id']}).json()['payload']
+            self.assertEqual(len(prepared['announcements']), 1)
+            self.assertEqual(prepared['announcements'][0]['title']['de'], '')
+            self.assertEqual(prepared['announcements'][0]['paragraphs'][0], event['text'])
+        unassigned = self.client.post('/api/v1/documents/prepare', json={'template_id': 0, 'year': '2026/27', 'week_id': 'advent:2026-12-13'}).json()['payload']
+        self.assertEqual(unassigned['announcements'], [])
+        uploaded = self.client.post('/api/v1/templates', data={'parish_name': 'Edling', 'name': 'Test'}, files={'file': ('test.docx', Path('resources/vorlage.docx').read_bytes())}).json()
+        prepared = self.client.post('/api/v1/documents/prepare', json={'template_id': uploaded['id'], 'year': week['year'], 'week_id': week['week_id']}).json()['payload']
+        self.assertEqual(len(prepared['announcements']), 2)
+        rendered = render_docx(Path('resources/vorlage.docx').read_bytes(), DocumentPayload.model_validate(prepared))
+        with ZipFile(BytesIO(rendered)) as archive:
+            xml = archive.read('word/document.xml').decode('utf-8')
+        self.assertIn('Alle', xml)
+        self.assertNotIn('Firmvorbereitungen intern', xml)
+        invalid = [dict(body, parishes=[]), dict(body, name=' '), dict(body, weeks=[week, week]), dict(body, weeks=[dict(week, week_id='invalid')]), dict(body, event_date='2026-12-01')]
+        for entry in invalid:
+            self.assertEqual(self.client.post('/api/v1/events', json=entry).status_code, 422)
+        self.assertEqual(self.client.put(f'/api/v1/events/{id_}', json={**body, 'revision': 99}).status_code, 409)
+        payload = deepcopy(self.payload)
+        payload['days'][0]['notices'] = [{'id': 'event-copy', 'enabled': True, 'source_event_id': id_, 'text': event['text']}]
+        saved = self.save(payload)
+        updated = self.client.put(f'/api/v1/events/{id_}', json={**body, 'text': {'de': 'Geändert'}, 'revision': 1})
+        self.assertEqual(updated.status_code, 200, updated.text)
+        self.assertEqual(self.client.delete(f'/api/v1/events/{id_}?revision=1').status_code, 409)
+        self.assertEqual(self.client.delete(f'/api/v1/events/{id_}?revision=2').status_code, 200)
+        self.assertEqual(self.client.get(f'/api/v1/events/{id_}').status_code, 404)
+        snapshot = self.client.get(f"/api/v1/documents/{saved['id']}").json()['payload']['days'][0]['notices'][0]
+        self.assertEqual(snapshot['text']['de'], 'Alle sind eingeladen')
+        self.assertEqual(snapshot['text']['de_marks'], [{'start': 0, 'end': 4, 'bold': True, 'underline': False}])
+        newest = self.client.post('/api/v1/events', json=body).json()
+        self.client.delete(f"/api/v1/events/{newest['id']}?revision=1")
+        replacement = self.client.post('/api/v1/events', json=body).json()
+        self.assertGreater(replacement['id'], newest['id'])
+
     def test_optional_saint_day_and_multiple_bold_bilingual_titles(self):
         payload = deepcopy(self.payload)
         for index, (de, sl) in enumerate([('Kirchtag Hl. Lukas', 'Žegnanje Sv. Luka'), ('Erntedank', 'Zahvalna maša')]):
@@ -176,6 +301,29 @@ class DocumentTests(unittest.TestCase):
             for title in ['Kirchtag Hl. Lukas | Žegnanje Sv. Luka', 'Erntedank | Zahvalna maša']:
                 paragraph = next(p for p in root.findall('.//w:p', ns) if ''.join(p.itertext()) == title)
                 self.assertEqual(paragraph.find('w:r/w:rPr/w:b', ns).get('{'+ns['w']+'}val'), '1')
+
+    def test_empty_days_are_printed_unless_explicitly_disabled(self):
+        payload = deepcopy(self.payload)
+        for day in payload['days']:
+            day['celebrations'] = []
+            day['services'] = []
+            day['notices'] = []
+        payload['days'][3]['enabled'] = False
+        saved = self.save(payload)
+        response = self.client.post(f"/api/v1/documents/{saved['id']}/generate?revision=1")
+        self.assertEqual(response.status_code, 200, response.text)
+        data = self.client.get(f"/api/v1/documents/{saved['id']}/docx").content
+        ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+        with ZipFile(BytesIO(data)) as archive:
+            root = ET.fromstring(archive.read('word/document.xml'))
+            text = ''.join(root.itertext())
+            for index, day in enumerate(payload['days']):
+                formatted = __import__('datetime').date.fromisoformat(day['date']).strftime('%d.%m.%Y')
+                if index == 3:
+                    self.assertNotIn(formatted, text)
+                else:
+                    self.assertIn(formatted, text)
+            self.assertEqual(len(root.findall('w:body/w:tbl/w:tr', ns)), 7)
 
     def test_legacy_overlaid_banner_is_normalized_without_changing_original_parts(self):
         source = Path('resources/vorlage.docx').read_bytes()
