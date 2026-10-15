@@ -67,7 +67,15 @@ Unterstützt werden PDF-Dateien bis 25 MB mit auswählbarem Text im Gurker Monat
 
 Fehlende Kalendertage verhindern den Import nicht, sofern mindestens 90 % des Kirchenjahres erkannt wurden. Der Importbericht enthält `missing_dates` (ISO-Daten) und `expected_calendar_days`. Die Oberfläche zeigt die Lücken nach dem Upload und dauerhaft bei den vorhandenen Directorien an. Für fehlende Tage entstehen keine erfundenen Feiern oder Quellenabschnitte.
 
-## Nach liturgischer Woche filtern
+## Abkündigungen erstellen
+
+Die Navigation **Erstellen** (`#/erstellen`) führt durch Auswahl, Bearbeitung und PDF-Ausgabe. **Woche laden** erzeugt einen neuen Entwurf; ein Bestätigungsdialog schützt ungespeicherte Änderungen beim Wechsel zu einem anderen Entwurf. Ein Entwurf wird zusätzlich lokal im Browser zwischengespeichert. **Entwurf speichern** legt ihn samt Word-Vorlage auf dem Server ab. Der Browser-Zwischenspeicher ist kein Ersatz für diese Speicherung.
+
+Die Bearbeitung gliedert sich in **Gottesdienste & Heilige**, **Termine & Kontakt** und **Inhaltsvorschau**. Die Inhaltsvorschau zeigt Texte; das Layout des PDFs kommt aus der Word-Vorlage. Leere Tage werden in der Ausgabe ausgelassen. Bestehende Originaltexte aus der Vorlage werden in den variablen Bereichen ersetzt, damit keine alten Termine oder Kontaktpersonen übernommen werden.
+
+**Abkündigung erstellen** speichert den aktuellen Entwurf und konvertiert ihn nach PDF. Der Download erscheint nach erfolgreicher Erstellung. Änderungen blenden diesen Download aus, bis erneut ein PDF erstellt wurde. Die Liste unten zeigt gespeicherte Entwürfe mit Paging und ermöglicht das erneute Öffnen.
+
+## Verwaltungsfilter für liturgische Wochen
 
 In der Heiligenverwaltung das Jahr auswählen und danach direkt neben dem Monat die liturgische Woche wählen. Die Zeiten sind als Gruppen in diesem einen Dropdown zusammengefasst. Die Optionen werden aus den datierten Überschriften des importierten Directoriums abgeleitet. Es werden keine ISO-Kalenderwochen verwendet. Der Zeitraum reicht jeweils vom zugehörigen Sonntag bis einschließlich des folgenden Sonntags. Für Weihnachtszeit, Karwoche und den Fastenbeginn werden benannte Zeiträume statt erfundener Wochennummern angeboten.
 

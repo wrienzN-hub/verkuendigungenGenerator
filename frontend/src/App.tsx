@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import SaintsPage from './SaintsPage';
 import TemplatesPage from './TemplatesPage';
+import DocumentsPage from './DocumentsPage';
 
 export default function App() {
   const [route, setRoute] = useState(window.location.hash);
@@ -20,6 +21,7 @@ export default function App() {
   }, []);
   const isSaints = route === '#/heilige';
   const isTemplates = route === '#/vorlagen';
+  const isDocuments = route === '#/erstellen';
   return (
     <>
       <a className="skip-link" href="#main">
@@ -36,11 +38,19 @@ export default function App() {
           <nav aria-label="Hauptnavigation">
             <a
               href="#/"
-              className={!isSaints && !isTemplates ? 'active' : ''}
-              aria-current={!isSaints && !isTemplates ? 'page' : undefined}
+              className={!isSaints && !isTemplates && !isDocuments ? 'active' : ''}
+              aria-current={!isSaints && !isTemplates && !isDocuments ? 'page' : undefined}
             >
               <CalendarDays size={17} />
               Übersicht
+            </a>
+            <a
+              href="#/erstellen"
+              className={isDocuments ? 'active' : ''}
+              aria-current={isDocuments ? 'page' : undefined}
+            >
+              <FileText size={17} />
+              Erstellen
             </a>
             <a
               href="#/heilige"
@@ -65,11 +75,19 @@ export default function App() {
         <div className="breadcrumb">
           Pfarrverwaltung <ChevronRight size={13} />
           <span>
-            {isSaints ? 'Heilige & Gedenktage' : isTemplates ? 'Word-Vorlagen' : 'Übersicht'}
+            {isSaints
+              ? 'Heilige & Gedenktage'
+              : isTemplates
+              ? 'Word-Vorlagen'
+              : isDocuments
+              ? 'Abkündigung erstellen'
+              : 'Übersicht'}
           </span>
         </div>
         {isSaints ? (
           <SaintsPage />
+        ) : isDocuments ? (
+          <DocumentsPage />
         ) : isTemplates ? (
           <TemplatesPage />
         ) : (
@@ -88,26 +106,28 @@ export default function App() {
                 Verkündigungen vorbereiten und den liturgischen Kalender im Blick behalten. Alles an
                 einem Ort.
               </p>
-              <a className="button primary" href="#/heilige">
-                Heilige verwalten <ArrowRight size={17} />
+              <a className="button primary" href="#/erstellen">
+                Abkündigung erstellen <ArrowRight size={17} />
               </a>
               <div className="hero-ornament" aria-hidden="true">
                 <Church size={170} strokeWidth={0.7} />
               </div>
             </section>
             <div className="home-grid">
-              <section className="home-card">
+              <a className="home-card linked-card" href="#/erstellen">
                 <span className="icon-box">
                   <CalendarDays size={22} />
                 </span>
-                <span className="muted-label">IN VORBEREITUNG</span>
+                <span className="muted-label">ABKÜNDIGUNGEN ERSTELLEN</span>
                 <h2>Eine Woche. Eine Verkündigung.</h2>
                 <p>
-                  Hier wirst du eine liturgische Woche auswählen, Gottesdienste ergänzen und deine
-                  Verkündigung als PDF erstellen können.
+                  Eine liturgische Woche auswählen, Gottesdienste und Intentionen ergänzen und die
+                  Abkündigung auf Grundlage deiner Word-Vorlage als PDF erstellen.
                 </p>
-                <span className="coming-label">Die Wochenauswahl folgt im nächsten Schritt.</span>
-              </section>
+                <span className="text-link">
+                  Zur Erstellung <ArrowRight size={16} />
+                </span>
+              </a>
               <a className="home-card linked-card" href="#/heilige">
                 <span className="icon-box">
                   <BookOpen size={22} />

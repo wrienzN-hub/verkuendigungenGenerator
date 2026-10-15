@@ -1,15 +1,19 @@
 {
   "schema_version": 1,
-  "template_id": "eberndorf",
-  "template_version": 1,
+  "template_id": 0,
+  "template_version": "8ffb4dcda7f43a2517260d5200119638e3e7655e7d3d028886e981fd6053b4aa",
   "parish": {
     "id": "eberndorf",
-    "name": { "de": "Pfarre Eberndorf", "sl": "" }
+    "name": {
+      "de": "Pfarre Eberndorf",
+      "sl": ""
+    }
   },
   "selection": {
     "liturgical_year": "2026/27",
     "season": "advent",
-    "week": 1
+    "week": 1,
+    "week_id": "advent:2026-11-29"
   },
   "period": {
     "start": "2026-11-29",
@@ -24,7 +28,10 @@
         {
           "id": "celebration-1",
           "source_celebration_id": null,
-          "title": { "de": "1. Adventssonntag", "sl": "" },
+          "title": {
+            "de": "1. Adventssonntag",
+            "sl": ""
+          },
           "rank": "sunday",
           "enabled": true
         }
@@ -34,14 +41,23 @@
           "id": "service-1",
           "enabled": true,
           "time": null,
-          "location": { "de": "", "sl": "" },
-          "title": { "de": "Heilige Messe", "sl": "Sveta maša" },
+          "location": {
+            "de": "",
+            "sl": ""
+          },
+          "title": {
+            "de": "Heilige Messe",
+            "sl": "Sveta maša"
+          },
           "intentions": [
             {
               "id": "intention-1",
               "enabled": true,
               "symbol": "+",
-              "text": { "de": "", "sl": "" },
+              "text": {
+                "de": "",
+                "sl": ""
+              },
               "reference": null
             }
           ],
@@ -52,7 +68,10 @@
         {
           "id": "day-notice-1",
           "enabled": true,
-          "text": { "de": "", "sl": "" }
+          "text": {
+            "de": "",
+            "sl": ""
+          }
         }
       ]
     }
@@ -61,21 +80,43 @@
     {
       "id": "announcement-1",
       "enabled": true,
-      "title": { "de": "", "sl": "" },
-      "paragraphs": [ { "de": "", "sl": "" } ]
+      "title": {
+        "de": "",
+        "sl": ""
+      },
+      "paragraphs": [
+        {
+          "de": "",
+          "sl": ""
+        }
+      ]
     }
   ],
   "eternal_light": {
     "enabled": true,
-    "dedication": { "de": "", "sl": "" }
+    "dedication": {
+      "de": "",
+      "sl": ""
+    }
   },
   "office_hours": [
-    { "weekday": "tuesday", "from": "10:00", "until": "12:00" },
-    { "weekday": "thursday", "from": "09:00", "until": "12:00" }
+    {
+      "weekday": "tuesday",
+      "from": "10:00",
+      "until": "12:00"
+    },
+    {
+      "weekday": "thursday",
+      "from": "09:00",
+      "until": "12:00"
+    }
   ],
   "contact": {
     "persons": [
-      { "name": "", "phone": "" }
+      {
+        "name": "",
+        "phone": ""
+      }
     ],
     "email": "",
     "website": ""

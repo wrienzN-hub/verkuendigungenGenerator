@@ -26,7 +26,7 @@ def database(path=DEFAULT_DATABASE):
 
 def migrate(conn):
     version = conn.execute("PRAGMA user_version").fetchone()[0]
-    if version > 3:
+    if version > 4:
         raise ValueError("Die Datenbank ist neuer als diese Anwendung.")
     for migration in sorted((Path(__file__).parent / 'migrations').glob('*.sql')):
         target = int(migration.name.split('_')[0])

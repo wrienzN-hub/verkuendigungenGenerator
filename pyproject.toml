@@ -7,7 +7,7 @@ name = "verkuendigungen-generator"
 version = "0.1.0"
 description = "Directorium-Import und Datenbank für Verkündigungen der Diözese Gurk"
 requires-python = ">=3.12"
-dependencies = ["pypdf==6.10.0", "fastapi>=0.115,<1", "uvicorn>=0.30,<1", "python-multipart>=0.0.20,<1"]
+dependencies = ["pypdf==6.10.0", "fastapi>=0.115,<1", "uvicorn>=0.30,<1", "python-multipart>=0.0.20,<1", "lxml>=5,<7"]
 
 [project.optional-dependencies]
 test = ["httpx>=0.27,<1"]
@@ -16,7 +16,7 @@ test = ["httpx>=0.27,<1"]
 verkuendigungen = "verkuendigungen.cli:main"
 
 [tool.setuptools.package-data]
-verkuendigungen = ["infrastructure/migrations/*.sql"]
+verkuendigungen = ["infrastructure/migrations/*.sql", "services/*.ps1"]
 
 [tool.setuptools.packages.find]
 include = ["verkuendigungen*"]

@@ -7,6 +7,8 @@ export async function request<T>(url: string, options?: RequestInit): Promise<T>
     throw new Error(
       typeof body?.detail === 'string'
         ? body.detail
+        : Array.isArray(body?.detail) && body.detail[0]?.msg
+        ? `Bitte die Eingaben prüfen: ${body.detail[0].msg}`
         : `Die Anfrage konnte nicht verarbeitet werden (${response.status}).`,
     );
   }

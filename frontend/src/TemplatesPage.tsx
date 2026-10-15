@@ -204,8 +204,9 @@ export default function TemplatesPage() {
         )}
       </section>
       <p className="info-note">
-        Die Vorlagen stehen für die spätere Dokumenterstellung bereit. Das automatische Befüllen und
-        die PDF-Erstellung folgen in einem nächsten Schritt.
+        Für die Erstellung wird die vorhandene Wochentabelle unterstützt. Eigene Vorlagen können
+        einen separaten Absatz mit {'{{inhalt}}'} für die Wocheninhalte enthalten. Die Auswahl
+        erfolgt unter <a href="#/erstellen">Abkündigung erstellen</a>.
       </p>
     </>
   );

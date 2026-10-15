@@ -55,12 +55,16 @@ Die Anwendung ist ein modularer Monolith: HTTP-Routen und Pydantic-Schemas, Impo
 - [Oberfläche und Entwicklungsbetrieb](docs/frontend.md)
 - [REST-API](docs/rest-api.md)
 - [Datenbank und Import](docs/datenbank.md)
-- [Geplanter Dokumentablauf und JSON-Vertrag](docs/dokumentablauf.md)
+- [Dokumentablauf und JSON-Vertrag](docs/dokumentablauf.md)
 - [JSON-Template](resources/templates/document-payload.template.json)
 
-## Nächste Ausbaustufe
+## Abkündigung erstellen
 
-Mitarbeitende wählen ein Kirchenjahr, eine liturgische Zeit und deren Woche, beispielsweise „2026/27 → Advent → 1. Woche“. Die Anwendung lädt die Feiern vom ersten bis einschließlich des folgenden Sonntags. Anschließend lassen sich Gottesdienste, Orte, Zeiten, Messintentionen und Termine ergänzen. Das vollständige Dokument wird als JSON gespeichert und über die Word-Vorlage nach PDF ausgegeben. Wochenauswahl und Dokumenterzeugung sind noch nicht implementiert.
+Unter **Erstellen** Pfarre, Word-Vorlage, Kirchenjahr und liturgische Woche wählen und **Woche laden** klicken. Die Anwendung lädt acht Tage von Sonntag bis zum folgenden Sonntag. Gottesdienste, Orte, Uhrzeiten, Messintentionen und Hinweise lassen sich je Tag zweisprachig bearbeiten. Unter **Termine & Kontakt** stehen Ankündigungen, Ewiges Licht, Kanzleistunden und Kontakte bereit. **Abkündigung erstellen** speichert den Entwurf, befüllt die Word-Vorlage und erzeugt das PDF zum Download. Gespeicherte Entwürfe können später erneut geöffnet werden.
+
+Die PDF-Konvertierung benötigt **Microsoft Word unter Windows** (für den Benutzer eingerichtet) oder **LibreOffice**. Es ist kein Docker-Container nötig. LibreOffice wird auf dem PATH oder im Standardinstallationsordner gefunden; alternativ `VERKUENDIGUNGEN_SOFFICE` auf die ausführbare Datei setzen. Ein fehlender Konverter verhindert das Speichern von Entwürfen nicht.
+
+Die Eberndorfer Vorlage aus `resources/vorlage.docx` ist direkt auswählbar. Hochgeladene Vorlagen werden unterstützt, wenn sie die vorhandene Wochentabelle verwenden oder einen eigenen Absatz mit `{{inhalt}}` enthalten. Siehe [Dokumentablauf](docs/dokumentablauf.md).
 
 ## Tests
 
