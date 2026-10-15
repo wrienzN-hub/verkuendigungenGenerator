@@ -97,6 +97,16 @@ curl.exe -F "file=@resources/directorium-2026-27-kern_21092026.pdf" http://127.0
 
 Fehlende Kalendertage verhindern den Import nicht, sofern mindestens 90 % des Kirchenjahres erkannt wurden. Der Importbericht enthält `missing_dates` (ISO-Daten) und `expected_calendar_days`. Die Oberfläche zeigt die Lücken nach dem Upload und dauerhaft bei den vorhandenen Directorien an. Für fehlende Tage entstehen keine erfundenen Feiern oder Quellenabschnitte.
 
+## Word-Vorlagen
+
+`GET /api/v1/templates` liefert alle Vorlagen als Metadaten mit `id`, `parish_name`, `name`, `source_filename`, `file_size` und `created_at`.
+
+`POST /api/v1/templates` speichert eine DOCX-Datei als Multipart-Upload mit den Feldern `file`, `parish_name` und `name` (jeweils 1–120 Zeichen). Pro Pfarre sind mehrere Vorlagen möglich; derselbe Name je Pfarre liefert HTTP 409. Erfolgreiche Uploads liefern HTTP 201 und die Metadaten. Maximalgröße: 25 MB (HTTP 413). Andere Dateiendungen liefern HTTP 415, ungültige oder verschlüsselte Word-Dateien HTTP 422. Makros werden nicht unterstützt.
+
+`GET /api/v1/templates/{id}/source` lädt die unveränderte Originaldatei herunter; unbekannte IDs liefern HTTP 404. Die Datei wird gemeinsam mit ihren Metadaten in SQLite gespeichert und ist damit Bestandteil einer Datenbanksicherung.
+
+Die React-Seite `#/vorlagen` bietet Upload, Pfarrfilter und Download. Automatisches Befüllen der Vorlagen und PDF-Erstellung sind noch nicht implementiert.
+
 ## Liturgische Wochen
 
 `GET /api/v1/saints/weeks?year=2026%2F27` liefert die im Directorium erkennbaren Wochen mit `id`, `season`, `season_label`, `week`, `label`, `start` und `end`. Für benannte Zeiträume ohne Wochennummer ist `week` null. Fehlende Kirchenjahre liefern eine leere Liste.

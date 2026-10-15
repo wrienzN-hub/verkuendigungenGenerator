@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, BookOpen, CalendarDays, Church, ChevronRight, Sprout } from 'lucide-react';
+import {
+  ArrowRight,
+  BookOpen,
+  CalendarDays,
+  Church,
+  ChevronRight,
+  Sprout,
+  FileText,
+} from 'lucide-react';
 import SaintsPage from './SaintsPage';
+import TemplatesPage from './TemplatesPage';
 
 export default function App() {
   const [route, setRoute] = useState(window.location.hash);
@@ -10,6 +19,7 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
   const isSaints = route === '#/heilige';
+  const isTemplates = route === '#/vorlagen';
   return (
     <>
       <a className="skip-link" href="#main">
@@ -26,8 +36,8 @@ export default function App() {
           <nav aria-label="Hauptnavigation">
             <a
               href="#/"
-              className={!isSaints ? 'active' : ''}
-              aria-current={!isSaints ? 'page' : undefined}
+              className={!isSaints && !isTemplates ? 'active' : ''}
+              aria-current={!isSaints && !isTemplates ? 'page' : undefined}
             >
               <CalendarDays size={17} />
               Übersicht
@@ -40,16 +50,28 @@ export default function App() {
               <BookOpen size={17} />
               Heilige
             </a>
+            <a
+              href="#/vorlagen"
+              className={isTemplates ? 'active' : ''}
+              aria-current={isTemplates ? 'page' : undefined}
+            >
+              <FileText size={17} />
+              Vorlagen
+            </a>
           </nav>
         </div>
       </header>
       <main id="main" tabIndex={-1} className="page-shell">
         <div className="breadcrumb">
           Pfarrverwaltung <ChevronRight size={13} />
-          <span>{isSaints ? 'Heilige & Gedenktage' : 'Übersicht'}</span>
+          <span>
+            {isSaints ? 'Heilige & Gedenktage' : isTemplates ? 'Word-Vorlagen' : 'Übersicht'}
+          </span>
         </div>
         {isSaints ? (
           <SaintsPage />
+        ) : isTemplates ? (
+          <TemplatesPage />
         ) : (
           <>
             <section className="home-hero">
@@ -105,7 +127,7 @@ export default function App() {
         )}
       </main>
       <footer className="site-footer">
-        <span>Verkündigungen · Pfarre Eberndorf</span>
+        <span>Verkündigungen · Pfarrverwaltung</span>
         <span>Mit Sorgfalt durch das Kirchenjahr.</span>
       </footer>
     </>

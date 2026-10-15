@@ -1451,3 +1451,35 @@ tbody tr:hover {
 .filters > label {
   min-width: 0;
 }
+.template-upload {
+  padding: 25px;
+  margin-bottom: 24px;
+}
+.template-upload > p {
+  margin-bottom: 22px;
+}
+.template-upload .error-box,
+.template-upload .success-box {
+  margin-top: 18px;
+}
+.template-empty {
+  padding: 25px;
+}
+.templates-table {
+  min-width: 750px;
+}
+.templates-table small {
+  color: #7d8c73;
+}
+@media (max-width: 700px) {
+  .header-inner {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .site-header nav {
+    flex-wrap: wrap;
+  }
+  .template-upload {
+    padding: 18px;
+  }
+}
