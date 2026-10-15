@@ -1,3 +1,6 @@
+import { useRef } from 'react';
+import ItemDetails from './ItemDetails';
+import IntentionInput, { intentionText } from './IntentionInput';
 import type { DocumentDay } from './documentTypes';
 import {
   emptyText,
@@ -18,6 +21,9 @@ export default function DocumentDayEditor({
   onChange: (day: DocumentDay) => void;
   servicesOnly?: boolean;
 }) {
+  const originalIds = useRef(
+    new Set(day.services.flatMap((s) => [s.id, ...s.intentions.map((i) => i.id)])),
+  );
   const edit = (change: (copy: DocumentDay) => void) => {
     const copy = structuredClone(day);
     change(copy);
@@ -113,7 +119,11 @@ export default function DocumentDayEditor({
         )}
         <h3>Gottesdienste</h3>
         {day.services.map((service, index) => (
-          <details key={service.id} className="service-editor config-panel">
+          <ItemDetails
+            initiallyOpen={!originalIds.current.has(service.id)}
+            key={service.id}
+            className="service-editor config-panel"
+          >
             <summary>
               Gottesdienst {index + 1}
               {service.time ? ` · ${service.time}` : ''}
@@ -170,7 +180,14 @@ export default function DocumentDayEditor({
               optionale Referenz werden mit ausgegeben.
             </p>
             {service.intentions.map((intention, intentionIndex) => (
-              <div className="document-item" key={intention.id}>
+              <ItemDetails
+                initiallyOpen={!originalIds.current.has(intention.id)}
+                className="document-item config-panel intention-editor"
+                key={intention.id}
+              >
+                <summary>
+                  {intentionText(intention.text).value || `Intention ${intentionIndex + 1}`}
+                </summary>
                 <div className="document-item-bar">
                   <label className="inline-check">
                     <input
@@ -193,10 +210,7 @@ export default function DocumentDayEditor({
                     }
                   />
                 </div>
-                <TextFields
-                  label="Intention"
-                  rich
-                  multiline
+                <IntentionInput
                   value={intention.text}
                   onChange={(value) =>
                     edit((d) => {
@@ -232,7 +246,7 @@ export default function DocumentDayEditor({
                     />
                   </label>
                 </div>
-              </div>
+              </ItemDetails>
             ))}
             <button
               className="button secondary"
@@ -262,7 +276,7 @@ export default function DocumentDayEditor({
                 })
               }
             />
-          </details>
+          </ItemDetails>
         ))}
         <button
           type="button"

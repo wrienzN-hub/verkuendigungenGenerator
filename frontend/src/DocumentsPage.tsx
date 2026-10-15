@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Download, FilePlus2, Save } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Download, FilePlus2, Save, RefreshCw } from 'lucide-react';
 import { request } from './api';
 import type { LiturgicalWeek } from './types';
 import type { DocumentOptions, Payload, SavedDocument } from './documentTypes';
@@ -7,8 +7,9 @@ import { formatDate } from './DocumentFields';
 import DocumentDayEditor from './DocumentDayEditor';
 import DocumentExtras from './DocumentExtras';
 import DocumentPreview from './DocumentPreview';
+import { freshServices, mergeServices, type ServiceDraft } from './serviceRefresh';
 
-type Draft = { payload: Payload; id?: number; revision?: number; hasDocx: boolean; dirty: boolean };
+type Draft = ServiceDraft;
 const STORAGE = 'verkuendigungen-document-draft-v1';
 function recover(): Draft | null {
   try {
@@ -31,6 +32,8 @@ export default function DocumentsPage({ documentId }: { documentId?: number }) {
   const [weekId, setWeekId] = useState('');
   const [weeksLoading, setWeeksLoading] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(recover);
+  const live = useRef(draft);
+  live.current = draft;
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [tab, setTab] = useState('days');
   const [busy, setBusy] = useState('');
@@ -98,7 +101,20 @@ export default function DocumentsPage({ documentId }: { documentId?: number }) {
       if (!current) return current;
       const payload = structuredClone(current.payload);
       change(payload);
-      return { ...current, payload, dirty: true, hasDocx: false };
+      const serviceChanges = new Set(
+        current.serviceChanges ?? (current.dirty ? current.payload.days.map((d) => d.date) : []),
+      );
+      payload.days.forEach((d, i) => {
+        if (JSON.stringify(d.services) !== JSON.stringify(current.payload.days[i].services))
+          serviceChanges.add(d.date);
+      });
+      return {
+        ...current,
+        payload,
+        serviceChanges: [...serviceChanges],
+        dirty: true,
+        hasDocx: false,
+      };
     });
     setMessage('');
     setPreviewUrl(null);
@@ -117,7 +133,7 @@ export default function DocumentsPage({ documentId }: { documentId?: number }) {
           body: JSON.stringify({ template_id: Number(template), year, week_id: weekId }),
         },
       );
-      setDraft({ payload: result.payload, hasDocx: false, dirty: true });
+      setDraft({ payload: result.payload, hasDocx: false, dirty: true, serviceChanges: [] });
       setPreviewUrl(null);
       setWarnings(result.warnings);
       setTab('days');
@@ -127,24 +143,70 @@ export default function DocumentsPage({ documentId }: { documentId?: number }) {
       setBusy('');
     }
   }
+  async function refresh(force = false) {
+    const initial = live.current;
+    if (!initial) return;
+    if (
+      force &&
+      (initial.serviceChanges?.length || (initial.dirty && !initial.serviceChanges)) &&
+      !window.confirm(
+        'Ungespeicherte Änderungen an Gottesdiensten verwerfen und den aktuellen Stand laden?',
+      )
+    )
+      return;
+    const rows = await freshServices(initial.payload);
+    const current = live.current;
+    if (
+      !current ||
+      current.id !== initial.id ||
+      current.payload.period.start !== initial.payload.period.start ||
+      current.payload.parish.id !== initial.payload.parish.id
+    )
+      return;
+    const merged = mergeServices(current, rows, force);
+    if (merged.draft !== current) {
+      live.current = merged.draft;
+      setDraft(merged.draft);
+      setPreviewUrl(null);
+    }
+    if (merged.conflict)
+      setError(
+        'Gottesdienste wurden andernorts geändert. Deine Eingaben bleiben erhalten. Bitte Gottesdienste neu laden, bevor du speicherst.',
+      );
+    else if (force) {
+      setError('');
+      setMessage('Gottesdienste auf dem aktuellen Stand.');
+    }
+    return merged;
+  }
   async function save(): Promise<SavedDocument> {
-    if (!draft) throw new Error('Bitte zuerst eine Woche laden.');
-    if (draft.id && !draft.dirty) return request<SavedDocument>(`/api/v1/documents/${draft.id}`);
+    if (!live.current) throw new Error('Bitte zuerst eine Woche laden.');
+    const refreshed = await refresh();
+    if (refreshed?.conflict)
+      throw new Error(
+        'Die Gottesdienste wurden geändert. Bitte Gottesdienste neu laden; deine übrigen Eingaben bleiben erhalten.',
+      );
+    const current = live.current!;
+    if (current.id && !current.dirty)
+      return request<SavedDocument>(`/api/v1/documents/${current.id}`, { cache: 'no-store' });
     const saved = await request<SavedDocument>(
-      draft.id ? `/api/v1/documents/${draft.id}` : '/api/v1/documents',
+      current.id ? `/api/v1/documents/${current.id}` : '/api/v1/documents',
       {
-        method: draft.id ? 'PUT' : 'POST',
+        method: current.id ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ payload: draft.payload, revision: draft.revision ?? null }),
+        body: JSON.stringify({ payload: current.payload, revision: current.revision ?? null }),
       },
     );
-    setDraft({
+    const next = {
       payload: saved.payload,
       id: saved.id,
       revision: saved.revision,
       hasDocx: saved.has_docx,
       dirty: false,
-    });
+      serviceChanges: [],
+    };
+    live.current = next;
+    setDraft(next);
     return saved;
   }
   async function action(generate: boolean) {
@@ -194,13 +256,22 @@ export default function DocumentsPage({ documentId }: { documentId?: number }) {
     setError('');
     setMessage('');
     try {
-      const saved = await request<SavedDocument>(`/api/v1/documents/${id}`);
+      const saved = await request<SavedDocument>(`/api/v1/documents/${id}`, { cache: 'no-store' });
+      const rows = await freshServices(saved.payload);
+      const updated = mergeServices(
+        {
+          payload: saved.payload,
+          id: saved.id,
+          revision: saved.revision,
+          hasDocx: saved.has_docx,
+          dirty: false,
+          serviceChanges: [],
+        },
+        rows,
+      ).draft;
+      live.current = updated;
       setDraft({
-        payload: saved.payload,
-        id: saved.id,
-        revision: saved.revision,
-        hasDocx: saved.has_docx,
-        dirty: false,
+        ...updated,
       });
       setPreviewUrl(null);
       setWarnings([]);
@@ -214,6 +285,21 @@ export default function DocumentsPage({ documentId }: { documentId?: number }) {
   useEffect(() => {
     if (documentId) void open(documentId);
   }, [documentId]);
+  useEffect(() => {
+    if (!documentId) void refresh().catch((e: Error) => setError(e.message));
+  }, [documentId]);
+  useEffect(() => {
+    const update = () => {
+      if (!busy && document.visibilityState === 'visible')
+        void refresh().catch((e: Error) => setError(e.message));
+    };
+    window.addEventListener('focus', update);
+    document.addEventListener('visibilitychange', update);
+    return () => {
+      window.removeEventListener('focus', update);
+      document.removeEventListener('visibilitychange', update);
+    };
+  }, [busy]);
   return (
     <>
       <section className="page-heading">
@@ -377,7 +463,10 @@ export default function DocumentsPage({ documentId }: { documentId?: number }) {
                   key={value}
                   onClick={() => {
                     if (value === 'preview') void preview();
-                    else setTab(value);
+                    else {
+                      setTab(value);
+                      if (value === 'days') void refresh().catch((e: Error) => setError(e.message));
+                    }
                   }}
                 >
                   {label}
@@ -387,6 +476,14 @@ export default function DocumentsPage({ documentId }: { documentId?: number }) {
             <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
               {tab === 'days' && (
                 <div className="document-days">
+                  <button
+                    type="button"
+                    className="button secondary"
+                    onClick={() => void refresh(true).catch((e: Error) => setError(e.message))}
+                  >
+                    <RefreshCw size={16} />
+                    Gottesdienste neu laden
+                  </button>
                   <p className="field-help">
                     Beim Speichern werden Gottesdienste und Intentionen für dieses Datum hinterlegt.
                     Eine neu geladene Nachbarwoche übernimmt den gemeinsamen Sonntag automatisch.

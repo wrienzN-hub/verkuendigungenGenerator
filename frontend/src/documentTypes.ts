@@ -40,7 +40,14 @@ export type Payload = {
   selection: { liturgical_year: string; season: string; week: number | null; week_id: string };
   period: { start: string; end: string };
   days: DocumentDay[];
-  announcements: { id: string; enabled: boolean; title: Bilingual; paragraphs: Bilingual[] }[];
+  announcements: {
+    id: string;
+    enabled: boolean;
+    internal_name?: string;
+    source_event_id?: number | null;
+    title: Bilingual;
+    paragraphs: Bilingual[];
+  }[];
   eternal_light: { enabled: boolean; dedication: Bilingual };
   office_hours: { weekday: string; from: string; until: string }[];
   contact: { persons: { name: string; phone: string }[]; email: string; website: string };

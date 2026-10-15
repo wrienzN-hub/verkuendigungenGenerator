@@ -193,6 +193,14 @@ class DocumentTests(unittest.TestCase):
         self.assertEqual(next_payload['days'][0]['services'], saved['payload']['days'][7]['services'])
         self.assertEqual(next_payload['days'][0]['services'][0]['title']['de'], '')
         self.assertEqual(next_payload['days'][7]['services'], [])
+        batch = self.client.get('/api/v1/services?parish=Eberndorf&start=2026-11-29&end=2026-12-06')
+        self.assertEqual(batch.status_code, 200, batch.text)
+        self.assertEqual(batch.headers['cache-control'], 'no-store')
+        self.assertEqual(len(batch.json()['items']), 8)
+        self.assertEqual(batch.json()['items'][-1]['services'], saved['payload']['days'][7]['services'])
+        self.assertEqual(self.client.get('/api/v1/services?parish=Eberndorf&start=2026-12-06&end=2026-11-29').status_code, 422)
+        self.assertEqual(self.client.get('/api/v1/services?parish=Eberndorf&start=2026-12-06&end=2027-02-01').status_code, 422)
+        self.assertEqual(self.client.get('/api/v1/services/2026-12-06?parish=Eberndorf').headers['cache-control'], 'no-store')
         read = self.client.get('/api/v1/services/2026-12-06?parish=Eberndorf').json()
         edited = deepcopy(read)
         edited['services'][0]['intentions'][0]['text']['de'] = 'Geaendert'
@@ -257,7 +265,10 @@ class DocumentTests(unittest.TestCase):
             prepared = self.client.post('/api/v1/documents/prepare', json={'template_id': 0, 'year': selected['year'], 'week_id': selected['week_id']}).json()['payload']
             self.assertEqual(len(prepared['announcements']), 1)
             self.assertEqual(prepared['announcements'][0]['title']['de'], '')
+            self.assertEqual(prepared['announcements'][0]['internal_name'], body['name'])
+            self.assertEqual(prepared['announcements'][0]['source_event_id'], id_)
             self.assertEqual(prepared['announcements'][0]['paragraphs'][0], event['text'])
+        named_snapshot = self.save(prepared)
         unassigned = self.client.post('/api/v1/documents/prepare', json={'template_id': 0, 'year': '2026/27', 'week_id': 'advent:2026-12-13'}).json()['payload']
         self.assertEqual(unassigned['announcements'], [])
         uploaded = self.client.post('/api/v1/templates', data={'parish_name': 'Edling', 'name': 'Test'}, files={'file': ('test.docx', Path('resources/vorlage.docx').read_bytes())}).json()
@@ -280,6 +291,9 @@ class DocumentTests(unittest.TestCase):
         self.assertEqual(self.client.delete(f'/api/v1/events/{id_}?revision=1').status_code, 409)
         self.assertEqual(self.client.delete(f'/api/v1/events/{id_}?revision=2').status_code, 200)
         self.assertEqual(self.client.get(f'/api/v1/events/{id_}').status_code, 404)
+        retained = self.client.get(f"/api/v1/documents/{named_snapshot['id']}").json()['payload']['announcements'][0]
+        self.assertEqual(retained['internal_name'], body['name'])
+        self.assertEqual(retained['paragraphs'][0], event['text'])
         snapshot = self.client.get(f"/api/v1/documents/{saved['id']}").json()['payload']['days'][0]['notices'][0]
         self.assertEqual(snapshot['text']['de'], 'Alle sind eingeladen')
         self.assertEqual(snapshot['text']['de_marks'], [{'start': 0, 'end': 4, 'bold': True, 'underline': False}])

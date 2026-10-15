@@ -1,3 +1,7 @@
+import { useEffect, useRef, useState } from 'react';
+import ItemDetails from './ItemDetails';
+import { request } from './api';
+import type { EventRecord } from './eventTypes';
 import type { Payload } from './documentTypes';
 import { emptyText, newId, RemoveButton, TextFields } from './DocumentFields';
 
@@ -20,14 +24,53 @@ export default function DocumentExtras({
   mode: 'extras' | 'contacts';
   edit: (change: (payload: Payload) => void) => void;
 }) {
+  const originalIds = useRef(new Set(payload.announcements.map((a) => a.id)));
+  const [events, setEvents] = useState<EventRecord[]>([]);
+  useEffect(() => {
+    if (mode !== 'extras') return;
+    const controller = new AbortController();
+    const query = new URLSearchParams({
+      parish: payload.parish.id,
+      year: payload.selection.liturgical_year,
+      week_id: payload.selection.week_id,
+      limit: '100',
+    });
+    request<{ items: EventRecord[] }>(`/api/v1/events?${query}`, { signal: controller.signal })
+      .then((r) => setEvents(r.items))
+      .catch(() => setEvents([]));
+    return () => controller.abort();
+  }, [mode, payload.parish.id, payload.selection.liturgical_year, payload.selection.week_id]);
+  function source(item: Payload['announcements'][number]) {
+    if (item.source_event_id) return events.find((e) => e.id === item.source_event_id);
+    const matches = events.filter(
+      (e) =>
+        item.paragraphs.length === 1 &&
+        item.paragraphs[0].de === e.text.de &&
+        item.paragraphs[0].sl === e.text.sl,
+    );
+    return matches.length === 1 ? matches[0] : undefined;
+  }
+  function name(item: Payload['announcements'][number], index: number) {
+    return (
+      item.internal_name ||
+      source(item)?.name ||
+      item.title.de ||
+      item.title.sl ||
+      `Termin ${index + 1}`
+    );
+  }
   return (
     <div className="document-extras">
       {mode === 'extras' && (
         <details className="list-panel document-section config-panel">
           <summary>Termine und Ankündigungen</summary>
           {payload.announcements.map((item, index) => (
-            <details className="document-item config-panel" key={item.id}>
-              <summary>{item.title.de || item.title.sl || `Termin ${index + 1}`}</summary>
+            <ItemDetails
+              initiallyOpen={!originalIds.current.has(item.id)}
+              className="document-item config-panel"
+              key={item.id}
+            >
+              <summary>{name(item, index)}</summary>
               <div className="document-item-bar">
                 <label className="inline-check">
                   <input
@@ -50,17 +93,6 @@ export default function DocumentExtras({
                   }
                 />
               </div>
-              <TextFields
-                label="Überschrift"
-                rich
-                defaultBold
-                value={item.title}
-                onChange={(value) =>
-                  edit((p) => {
-                    p.announcements[index].title = value;
-                  })
-                }
-              />
               {item.paragraphs.map((paragraph, paragraphIndex) => (
                 <div className="announcement-paragraph" key={paragraphIndex}>
                   <TextFields
@@ -70,6 +102,8 @@ export default function DocumentExtras({
                     value={paragraph}
                     onChange={(value) =>
                       edit((p) => {
+                        p.announcements[index].internal_name = name(item, index);
+                        p.announcements[index].source_event_id ??= source(item)?.id;
                         p.announcements[index].paragraphs[paragraphIndex] = value;
                       })
                     }
@@ -95,7 +129,7 @@ export default function DocumentExtras({
               >
                 + Absatz
               </button>
-            </details>
+            </ItemDetails>
           ))}
           <button
             className="button secondary"

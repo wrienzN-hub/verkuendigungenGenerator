@@ -107,3 +107,14 @@ Unter `#/gottesdienste` werden Gottesdienste und Intentionen pro Pfarre und konk
 Die Erstellung trennt Gottesdienste/Heilige, Termine, Kontakte und Vorschau. Tage, einzelne Gottesdienste und die Konfigurationsbereiche unter Termine, Kontakte und Einstellungen starten eingeklappt. Das zusätzliche Gottesdienst-Textfeld entfällt. Kanzleistunden werden mit eigener Überschrift und normalen Zeiten ausgegeben.
 
 Die Wochenzuordnung im Termin-Modal hat eine Textsuche und einen Filter für die liturgische Zeit. Die Auswahl bleibt auch bei gefilterter Liste erhalten. Formatierte Felder unterstützen Fett und Unterstreichen (Schaltflächen, Strg+B bzw. Strg+U).
+
+Im Terminbereich einer Verkündigung zeigt die eingeklappte Zeile den internen Namen des übernommenen Termins. Das zusätzliche Titelfeld entfällt; im Dokument wird nur der Inhalt ausgegeben. Der interne Name bleibt in der Momentaufnahme erhalten, auch nach Löschen des verwalteten Termins. Einzelne Intentionen sind ebenfalls aufklappbar und starten immer geschlossen.
+
+
+Gottesdienste werden beim Öffnen eines gespeicherten Entwurfs, bei Rückkehr zum Fenster/Reiter und unmittelbar vor Speichern/Erstellen frisch abgefragt. Unveränderte Gottesdienste werden im Entwurf aktualisiert. Lokale Änderungen an Gottesdiensten bleiben erhalten; bei abweichender Serverrevision wird das Speichern blockiert, bis der aktuelle Stand bewusst geladen wird. „Gottesdienste neu laden“ verwirft auf Wunsch ausschließlich diese Änderungen; übrige Inhalte bleiben bestehen. Die Gottesdienstverwaltung aktualisiert sich ebenfalls beim Fensterwechsel, ohne ungespeicherte Eingaben zu ersetzen.
+
+Vorhandene Einträge starten eingeklappt. Neu angelegte Gottesdienste, Intentionen und Termine öffnen sich sofort und können anschließend normal zugeklappt werden.
+
+Es gibt keine zeitgesteuerten Abfragen im Hintergrund. Änderungen aus der Gottesdienstverwaltung werden beim Öffnen oder Zurückwechseln in die Verkündigung und spätestens vor Speichern/Erstellen übernommen. Zusätzlich bleibt der manuelle Button zum Neuladen verfügbar.
+
+Messintentionen werden in einem gemeinsamen Feld „Messintention / Namen“ ohne Sprachaufteilung bearbeitet. Historische Inhalte aus Deutsch und Slowenisch erscheinen zusammen untereinander, einschließlich vorhandener Fett- und Unterstreichungsbereiche. Änderungen speichern den gemeinsamen Inhalt als ein Textfeld.

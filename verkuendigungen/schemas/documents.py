@@ -80,6 +80,8 @@ class Day(Visible):
 
 
 class Announcement(Visible):
+    internal_name: Annotated[str, Field(max_length=200)] = ''
+    source_event_id: int | None = Field(default=None, ge=1)
     title: Bilingual = Field(default_factory=Bilingual)
     paragraphs: list[Bilingual] = Field(default_factory=list, max_length=30)
 

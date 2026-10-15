@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Save } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Save, RefreshCw } from 'lucide-react';
 import { request } from './api';
 import type { DocumentDay, DocumentOptions, Service } from './documentTypes';
 import DocumentDayEditor from './DocumentDayEditor';
@@ -22,6 +22,8 @@ export default function ServicesPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const live = useRef({ day, revision, dirty, busy, parish, date });
+  live.current = { day, revision, dirty, busy, parish, date };
   useEffect(() => {
     request<DocumentOptions>('/api/v1/documents/options')
       .then((o) => {
@@ -40,6 +42,7 @@ export default function ServicesPage() {
     setMessage('');
     request<Saved>(`/api/v1/services/${date}?parish=${encodeURIComponent(parish)}`, {
       signal: controller.signal,
+      cache: 'no-store',
     })
       .then((r) => {
         setRevision(r.revision);
@@ -68,6 +71,53 @@ export default function ServicesPage() {
     window.addEventListener('beforeunload', f);
     return () => window.removeEventListener('beforeunload', f);
   }, [dirty]);
+  async function refresh(force = false) {
+    const initial = live.current;
+    if (!initial.parish || !initial.day || initial.busy) return;
+    if (
+      force &&
+      initial.dirty &&
+      !window.confirm('Ungespeicherte Gottesdienste verwerfen und neu laden?')
+    )
+      return;
+    const r = await request<Saved>(
+      `/api/v1/services/${initial.date}?parish=${encodeURIComponent(initial.parish)}`,
+      { cache: 'no-store' },
+    );
+    const current = live.current;
+    if (
+      current.parish !== initial.parish ||
+      current.date !== initial.date ||
+      !current.day ||
+      current.busy
+    )
+      return;
+    if (current.dirty && !force) {
+      if (r.revision !== current.revision)
+        setError(
+          'Die Gottesdienste wurden andernorts geändert. Deine Eingaben bleiben erhalten. Bitte neu laden.',
+        );
+      return;
+    }
+    if (r.revision !== current.revision || force) {
+      setRevision(r.revision);
+      setDay({ ...current.day, services: r.services });
+      setDirty(false);
+      setError('');
+    }
+  }
+  useEffect(() => {
+    const update = () => {
+      if (document.visibilityState === 'visible')
+        void refresh().catch((e: Error) => setError(e.message));
+    };
+    window.addEventListener('focus', update);
+    document.addEventListener('visibilitychange', update);
+    return () => {
+      window.removeEventListener('focus', update);
+      document.removeEventListener('visibilitychange', update);
+    };
+  }, []);
   function changeSelection(action: () => void) {
     if (!dirty || window.confirm('Ungespeicherte Gottesdienste verwerfen?')) action();
   }
@@ -150,6 +200,14 @@ export default function ServicesPage() {
                 setMessage('');
               }}
             />
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => void refresh(true).catch((e: Error) => setError(e.message))}
+            >
+              <RefreshCw size={16} />
+              Gottesdienste neu laden
+            </button>
             <button className="button primary" onClick={() => void save()} disabled={!dirty}>
               <Save size={16} />
               {busy ? 'Wird gespeichert …' : 'Gottesdienste speichern'}

@@ -87,8 +87,8 @@ def prepare(conn, template_id, year, week_id):
         for service in day['services']:
             service['title'] = {'de': '', 'sl': ''}
     assigned = []
-    for row in conn.execute("SELECT text_json FROM events WHERE EXISTS (SELECT 1 FROM json_each(parishes_json) WHERE value=? COLLATE NOCASE) AND EXISTS (SELECT 1 FROM json_each(weeks_json) WHERE json_extract(value,'$.year')=? AND json_extract(value,'$.week_id')=?) ORDER BY name COLLATE NOCASE,id", (template['parish_name'], year, week_id)):
-        assigned.append({'id': str(uuid4()), 'enabled': True, 'title': {'de': '', 'sl': ''}, 'paragraphs': [json.loads(row[0])]})
+    for row in conn.execute("SELECT id,name,text_json FROM events WHERE EXISTS (SELECT 1 FROM json_each(parishes_json) WHERE value=? COLLATE NOCASE) AND EXISTS (SELECT 1 FROM json_each(weeks_json) WHERE json_extract(value,'$.year')=? AND json_extract(value,'$.week_id')=?) ORDER BY name COLLATE NOCASE,id", (template['parish_name'], year, week_id)):
+        assigned.append({'id': str(uuid4()), 'enabled': True, 'internal_name': row['name'], 'source_event_id': row['id'], 'title': {'de': '', 'sl': ''}, 'paragraphs': [json.loads(row['text_json'])]})
     payload = DocumentPayload.model_validate({'schema_version': 1, 'template_id': template_id, 'template_version': hashlib.sha256(template['docx']).hexdigest(),
         'parish': {'id': template['parish_name'], 'name': {'de': template['parish_name'], 'sl': ''}},
         'selection': {'liturgical_year': year, 'season': week['season'], 'week': week['week'], 'week_id': week_id},

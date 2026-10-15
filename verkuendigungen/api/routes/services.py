@@ -1,7 +1,7 @@
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 from typing import Annotated
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, Response
 from pydantic import Field, model_validator
 from ..dependencies import get_database
 from ...schemas.documents import Model, Service
@@ -24,8 +24,16 @@ class ServicesInput(Model):
             raise ValueError('Die Eintraege benoetigen eindeutige IDs.')
         return self
 
+@router.get('')
+def services_range(parish: Parish, start: date, end: date, conn: Connection, response: Response):
+    response.headers['Cache-Control'] = 'no-store'
+    if not parish.strip() or end < start or (end-start).days > 31:
+        raise HTTPException(422, 'Bitte Pfarre und einen Zeitraum von maximal 32 Tagen angeben.')
+    return {'items': [{'date': (start+timedelta(days=i)).isoformat(), **read_services(conn, parish.strip(), start+timedelta(days=i))} for i in range((end-start).days+1)]}
+
 @router.get('/{day}')
-def get_services(day: date, parish: Parish, conn: Connection):
+def get_services(day: date, parish: Parish, conn: Connection, response: Response):
+    response.headers['Cache-Control'] = 'no-store'
     if not parish.strip():
         raise HTTPException(422, 'Eine Pfarre ist erforderlich.')
     return read_services(conn, parish.strip(), day)
